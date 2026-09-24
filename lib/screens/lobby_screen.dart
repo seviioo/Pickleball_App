@@ -22,20 +22,47 @@ class LobbyScreen extends StatefulWidget {
   State<LobbyScreen> createState() => _LobbyScreenState();
 }
 
-class _LobbyScreenState extends State<LobbyScreen> {
+class _LobbyScreenState extends State<LobbyScreen>
+    with SingleTickerProviderStateMixin {
   int userCoins = 0;
+  int userXp = 0;
+  int userWins = 0;
+  int userLosses = 0;
+  bool canClaimStash = false;
   PaddleData equippedPaddle = PaddleData.starter();
   bool isSoundOn = true;
   bool isHapticsOn = true;
 
+  late AnimationController _pulseController;
+  late Animation<double> _pulseScale;
+
   @override
   void initState() {
     super.initState();
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1100),
+    )..repeat(reverse: true);
+
+    _pulseScale = Tween<double>(begin: 0.98, end: 1.025).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    );
+
     _loadData();
+  }
+
+  @override
+  void dispose() {
+    _pulseController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadData() async {
     final coins = await StorageService.getCoins();
+    final xp = await StorageService.getXp();
+    final wins = await StorageService.getWins();
+    final losses = await StorageService.getLosses();
+    final canClaim = await StorageService.canClaimDailyStash();
     final paddle = await StorageService.getEquippedPaddle();
     final sound = await StorageService.getSoundEnabled();
     final haptics = await StorageService.getHapticsEnabled();
@@ -43,11 +70,105 @@ class _LobbyScreenState extends State<LobbyScreen> {
     if (mounted) {
       setState(() {
         userCoins = coins;
+        userXp = xp;
+        userWins = wins;
+        userLosses = losses;
+        canClaimStash = canClaim;
         equippedPaddle = paddle;
         isSoundOn = sound;
         isHapticsOn = haptics;
       });
     }
+  }
+
+  int get level => (userXp / 300).floor() + 1;
+  double get levelProgress => ((userXp % 300) / 300.0).clamp(0.0, 1.0);
+
+  String get rankTitle {
+    if (level == 1) return 'Rookie Dinker';
+    if (level == 2) return 'Alley Hustler';
+    if (level == 3) return 'Kitchen Crusher';
+    if (level == 4) return 'Baseline Boss';
+    return 'Street Legend';
+  }
+
+  int get totalMatches => userWins + userLosses;
+  String get winRate => totalMatches == 0
+      ? '0%'
+      : '${((userWins / totalMatches) * 100).toStringAsFixed(0)}%';
+
+  void _claimDailyStash() async {
+    await StorageService.claimDailyStash();
+    await _loadData();
+
+    if (!mounted) return;
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return Dialog(
+          backgroundColor: AppColors.surface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+            side: const BorderSide(color: AppColors.gold, width: 2),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 72,
+                  height: 72,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: AppColors.goldButton,
+                  ),
+                  child: const Icon(Icons.card_giftcard_rounded,
+                      color: Colors.black, size: 40),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'DAILY STASH CLAIMED!',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  '+150 COINS  ·  +100 XP',
+                  style: TextStyle(
+                    color: AppColors.gold,
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 22),
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.gold,
+                      foregroundColor: Colors.black,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('BOOST UP!',
+                        style: TextStyle(
+                            fontWeight: FontWeight.w900, fontSize: 15)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   void _openSettingsDialog() {
@@ -175,7 +296,8 @@ class _LobbyScreenState extends State<LobbyScreen> {
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
                                     children: [
-                                      const Kicker('STREET TAG'),
+                                      Kicker('LEVEL $level  ·  $rankTitle',
+                                          color: AppColors.gold),
                                       Text(widget.userName,
                                           style: const TextStyle(
                                               color: Colors.white,
@@ -233,9 +355,128 @@ class _LobbyScreenState extends State<LobbyScreen> {
                             ],
                           ),
 
-                          const SizedBox(height: 20),
+                          const SizedBox(height: 12),
 
-                          // Active Gear Spotlight
+                          // XP Level Progress Bar
+                          Container(
+                            width: double.infinity,
+                            height: 8,
+                            decoration: BoxDecoration(
+                              color: AppColors.surface,
+                              borderRadius: BorderRadius.circular(4),
+                              border: Border.all(
+                                  color: AppColors.hairline, width: 1),
+                            ),
+                            child: FractionallySizedBox(
+                              alignment: Alignment.centerLeft,
+                              widthFactor: levelProgress,
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  gradient: AppColors.goldButton,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                              ),
+                            ),
+                          ),
+
+                          const SizedBox(height: 16),
+
+                          // Daily Stash Bonus Banner
+                          StreetCard(
+                            borderColor: canClaimStash
+                                ? AppColors.gold
+                                : AppColors.hairline,
+                            borderWidth: canClaimStash ? 1.6 : 1.2,
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 42,
+                                  height: 42,
+                                  decoration: BoxDecoration(
+                                    color: canClaimStash
+                                        ? AppColors.gold.withOpacity(0.2)
+                                        : AppColors.surfaceRaised,
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Icon(
+                                    Icons.card_giftcard_rounded,
+                                    color: canClaimStash
+                                        ? AppColors.gold
+                                        : AppColors.textFaint,
+                                    size: 22,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      const Kicker('DAILY STREET STASH'),
+                                      Text(
+                                        canClaimStash
+                                            ? 'Bonus Ready: +150 Coins'
+                                            : 'Claimed Today (24h Refresh)',
+                                        style: TextStyle(
+                                          color: canClaimStash
+                                              ? AppColors.gold
+                                              : AppColors.textSecondary,
+                                          fontSize: 13.5,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                if (canClaimStash)
+                                  ElevatedButton(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: AppColors.gold,
+                                      foregroundColor: Colors.black,
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 14, vertical: 8),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                    ),
+                                    onPressed: _claimDailyStash,
+                                    child: const Text('CLAIM',
+                                        style: TextStyle(
+                                            fontWeight: FontWeight.w900,
+                                            fontSize: 12)),
+                                  ),
+                              ],
+                            ),
+                          ),
+
+                          const SizedBox(height: 14),
+
+                          // Lifetime Stats Widget
+                          StreetCard(
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                              children: [
+                                _buildStatColumn('WINS', '$userWins',
+                                    color: AppColors.win),
+                                Container(
+                                    width: 1,
+                                    height: 32,
+                                    color: AppColors.hairline),
+                                _buildStatColumn('LOSSES', '$userLosses',
+                                    color: AppColors.redBright),
+                                Container(
+                                    width: 1,
+                                    height: 32,
+                                    color: AppColors.hairline),
+                                _buildStatColumn('WIN RATE', winRate,
+                                    color: AppColors.gold),
+                              ],
+                            ),
+                          ),
+
+                          const SizedBox(height: 14),
+
+                          // Equipped Paddle Card
                           StreetCard(
                             child: Row(
                               children: [
@@ -287,22 +528,31 @@ class _LobbyScreenState extends State<LobbyScreen> {
 
                           const Spacer(),
 
-                          // Quick Match Hero CTA
-                          PrimaryCTA(
-                            label: 'QUICK STREET MATCH',
-                            icon: Icons.play_arrow_rounded,
-                            onPressed: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => MatchSetupScreen(
-                                    userName: widget.userName,
-                                    paddle: equippedPaddle,
-                                    characterStyle: widget.characterStyle,
-                                  ),
-                                ),
+                          // Animated Pulsing Quick Match CTA
+                          AnimatedBuilder(
+                            animation: _pulseScale,
+                            builder: (context, child) {
+                              return Transform.scale(
+                                scale: _pulseScale.value,
+                                child: child,
                               );
                             },
+                            child: PrimaryCTA(
+                              label: 'QUICK STREET MATCH',
+                              icon: Icons.play_arrow_rounded,
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => MatchSetupScreen(
+                                      userName: widget.userName,
+                                      paddle: equippedPaddle,
+                                      characterStyle: widget.characterStyle,
+                                    ),
+                                  ),
+                                ).then((_) => _loadData());
+                              },
+                            ),
                           ),
 
                           const SizedBox(height: 12),
@@ -324,7 +574,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
                                           characterStyle: widget.characterStyle,
                                         ),
                                       ),
-                                    );
+                                    ).then((_) => _loadData());
                                   },
                                 ),
                               ),
@@ -387,6 +637,23 @@ class _LobbyScreenState extends State<LobbyScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildStatColumn(String label, String value, {required Color color}) {
+    return Column(
+      children: [
+        Kicker(label, color: AppColors.textFaint),
+        const SizedBox(height: 2),
+        Text(
+          value,
+          style: TextStyle(
+            color: color,
+            fontSize: 17,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ],
     );
   }
 }

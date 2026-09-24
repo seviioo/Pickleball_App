@@ -11,6 +11,7 @@ class StorageService {
   static const String _keyHapticsEnabled = 'haptics_enabled';
   static const String _keyWins = 'user_wins';
   static const String _keyLosses = 'user_losses';
+  static const String _keyLastDailyClaim = 'last_daily_claim';
 
   static Future<int> getCoins() async {
     final prefs = await SharedPreferences.getInstance();
@@ -58,6 +59,16 @@ class StorageService {
     return prefs.getBool(_keyHapticsEnabled) ?? true;
   }
 
+  static Future<int> getWins() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getInt(_keyWins) ?? 0;
+  }
+
+  static Future<int> getLosses() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getInt(_keyLosses) ?? 0;
+  }
+
   static Future<void> recordMatchResult({required bool isWin}) async {
     final prefs = await SharedPreferences.getInstance();
     if (isWin) {
@@ -67,6 +78,21 @@ class StorageService {
       final losses = prefs.getInt(_keyLosses) ?? 0;
       await prefs.setInt(_keyLosses, losses + 1);
     }
+  }
+
+  static Future<bool> canClaimDailyStash() async {
+    final prefs = await SharedPreferences.getInstance();
+    final lastClaim = prefs.getInt(_keyLastDailyClaim) ?? 0;
+    final now = DateTime.now().millisecondsSinceEpoch;
+    return (now - lastClaim) >= 86400000; // 24 hours
+  }
+
+  static Future<void> claimDailyStash() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(
+        _keyLastDailyClaim, DateTime.now().millisecondsSinceEpoch);
+    await addCoins(150);
+    await addXp(100);
   }
 
   static Future<List<PaddleData>> getPaddles() async {
