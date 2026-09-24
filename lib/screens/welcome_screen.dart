@@ -82,7 +82,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                                     shape: BoxShape.circle,
                                     boxShadow: [
                                       BoxShadow(
-                                        color: AppColors.gold.withOpacity(0.35),
+                                        color: AppColors.gold.withValues(alpha: 0.35),
                                         blurRadius: 36,
                                         spreadRadius: 4,
                                       ),
@@ -98,7 +98,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                                     borderRadius: BorderRadius.circular(26),
                                     boxShadow: [
                                       BoxShadow(
-                                        color: AppColors.red.withOpacity(0.4),
+                                        color: AppColors.red.withValues(alpha: 0.4),
                                         blurRadius: 20,
                                       ),
                                     ],

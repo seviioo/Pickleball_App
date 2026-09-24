@@ -47,7 +47,7 @@ class AppColors {
 
   static RadialGradient spotlight(Color color, {double opacity = 0.18}) {
     return RadialGradient(
-      colors: [color.withOpacity(opacity), Colors.transparent],
+      colors: [color.withValues(alpha: opacity), Colors.transparent],
       radius: 1.1,
     );
   }
@@ -194,8 +194,8 @@ class StreetCard extends StatelessWidget {
       child: InkWell(
         borderRadius: BorderRadius.circular(18),
         onTap: onTap,
-        splashColor: AppColors.gold.withOpacity(0.08),
-        highlightColor: AppColors.gold.withOpacity(0.04),
+        splashColor: AppColors.gold.withValues(alpha: 0.08),
+        highlightColor: AppColors.gold.withValues(alpha: 0.04),
         child: content,
       ),
     );
@@ -248,7 +248,7 @@ class _PrimaryCTAState extends State<PrimaryCTA> {
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                color: widget.glowColor.withOpacity(_pressed ? 0.18 : 0.34),
+                color: widget.glowColor.withValues(alpha: _pressed ? 0.18 : 0.34),
                 blurRadius: _pressed ? 10 : 22,
                 offset: const Offset(0, 8),
               ),
@@ -348,9 +348,9 @@ class IconBadge extends StatelessWidget {
       width: size,
       height: size,
       decoration: BoxDecoration(
-        color: color.withOpacity(0.12),
+        color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(size * 0.28),
-        border: Border.all(color: color.withOpacity(0.5), width: 1.4),
+        border: Border.all(color: color.withValues(alpha: 0.5), width: 1.4),
       ),
       child: Icon(icon, color: color, size: size * 0.5),
     );

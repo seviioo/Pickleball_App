@@ -80,7 +80,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
                     ),
                     const SizedBox(height: 20),
                     SwitchListTile(
-                      activeColor: AppColors.gold,
+                      activeThumbColor: AppColors.gold,
                       title: const Text('Sound FX',
                           style: TextStyle(
                               color: Colors.white,
@@ -93,7 +93,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
                       },
                     ),
                     SwitchListTile(
-                      activeColor: AppColors.gold,
+                      activeThumbColor: AppColors.gold,
                       title: const Text('Haptic Vibration',
                           style: TextStyle(
                               color: Colors.white,

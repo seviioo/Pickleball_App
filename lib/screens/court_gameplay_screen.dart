@@ -28,14 +28,12 @@ class CourtGameplayScreen extends StatefulWidget {
 
 class _CourtGameplayScreenState extends State<CourtGameplayScreen> {
   late PickleballGame game;
-
   int playerScore = 0;
   int opponentScore = 0;
   bool isPlayerServing = true;
   String matchStatus = 'STREET SERVE READY';
   bool isGameOver = false;
   bool _hasShownGameOverModal = false;
-
   double ultimateGauge = 0.0;
   bool isUltimateActive = false;
 
@@ -52,8 +50,14 @@ class _CourtGameplayScreenState extends State<CourtGameplayScreen> {
   OrbType? orbType;
   bool isDoublePointsActive = false;
   bool isAiShrunk = false;
-
   String? timingFeedback;
+
+  double? aimTargetX;
+  double? aimTargetY;
+  bool isAiming = false;
+
+  String selectedShotType = 'DRIVE';
+
   CharacterAnimState playerAnimState = CharacterAnimState.idle;
   CharacterAnimState aiAnimState = CharacterAnimState.idle;
   int playerFrame = 0;
@@ -97,6 +101,9 @@ class _CourtGameplayScreenState extends State<CourtGameplayScreen> {
         required CharacterAnimState aiAnimState,
         required int playerFrame,
         required int aiFrame,
+        double? aimTargetX,
+        double? aimTargetY,
+        required bool isAiming,
       }) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) {
@@ -125,6 +132,9 @@ class _CourtGameplayScreenState extends State<CourtGameplayScreen> {
               this.aiAnimState = aiAnimState;
               this.playerFrame = playerFrame;
               this.aiFrame = aiFrame;
+              this.aimTargetX = aimTargetX;
+              this.aimTargetY = aimTargetY;
+              this.isAiming = isAiming;
             });
 
             if (isGameOver && !_hasShownGameOverModal) {
@@ -139,7 +149,6 @@ class _CourtGameplayScreenState extends State<CourtGameplayScreen> {
 
   void _showGameOverDialog() {
     final bool isWin = playerScore > opponentScore;
-
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -160,17 +169,14 @@ class _CourtGameplayScreenState extends State<CourtGameplayScreen> {
               children: [
                 Icon(
                   isWin ? Icons.emoji_events : Icons.sentiment_dissatisfied,
-                  color:
-                      isWin ? const Color(0xFFFACC15) : const Color(0xFFDC2626),
+                  color: isWin ? const Color(0xFFFACC15) : const Color(0xFFDC2626),
                   size: 64,
                 ),
                 const SizedBox(height: 12),
                 Text(
                   isWin ? 'VICTORY!' : 'DEFEAT!',
                   style: TextStyle(
-                    color: isWin
-                        ? const Color(0xFFFACC15)
-                        : const Color(0xFFDC2626),
+                    color: isWin ? const Color(0xFFFACC15) : const Color(0xFFDC2626),
                     fontSize: 28,
                     fontWeight: FontWeight.w900,
                   ),
@@ -190,12 +196,9 @@ class _CourtGameplayScreenState extends State<CourtGameplayScreen> {
                   height: 50,
                   child: ElevatedButton(
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: isWin
-                          ? const Color(0xFFFACC15)
-                          : const Color(0xFFDC2626),
+                      backgroundColor: isWin ? const Color(0xFFFACC15) : const Color(0xFFDC2626),
                       foregroundColor: isWin ? Colors.black : Colors.white,
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
                     onPressed: () {
                       Navigator.pop(context);
@@ -203,8 +206,7 @@ class _CourtGameplayScreenState extends State<CourtGameplayScreen> {
                     },
                     child: const Text(
                       'CLAIM MATCH REWARDS',
-                      style:
-                          TextStyle(fontWeight: FontWeight.w900, fontSize: 15),
+                      style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15),
                     ),
                   ),
                 ),
@@ -223,21 +225,15 @@ class _CourtGameplayScreenState extends State<CourtGameplayScreen> {
       builder: (context) {
         return Dialog(
           backgroundColor: const Color(0xFF18181B),
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           child: Padding(
             padding: const EdgeInsets.all(24.0),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.pause_circle_filled,
-                    color: Color(0xFFFACC15), size: 56),
+                const Icon(Icons.pause_circle_filled, color: Color(0xFFFACC15), size: 56),
                 const SizedBox(height: 12),
-                const Text('MATCH PAUSED',
-                    style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 22,
-                        fontWeight: FontWeight.w900)),
+                const Text('MATCH PAUSED', style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900)),
                 const SizedBox(height: 24),
                 SizedBox(
                   width: double.infinity,
@@ -246,12 +242,10 @@ class _CourtGameplayScreenState extends State<CourtGameplayScreen> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFFFACC15),
                       foregroundColor: Colors.black,
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
                     onPressed: () => Navigator.pop(context),
-                    child: const Text('RESUME MATCH',
-                        style: TextStyle(fontWeight: FontWeight.w900)),
+                    child: const Text('RESUME MATCH', style: TextStyle(fontWeight: FontWeight.w900)),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -262,8 +256,7 @@ class _CourtGameplayScreenState extends State<CourtGameplayScreen> {
                     style: OutlinedButton.styleFrom(
                       foregroundColor: Colors.white,
                       side: const BorderSide(color: Colors.white24),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
                     onPressed: () {
                       Navigator.pop(context);
@@ -275,8 +268,7 @@ class _CourtGameplayScreenState extends State<CourtGameplayScreen> {
                         game.isGameOver = false;
                       });
                     },
-                    child: const Text('RESTART MATCH',
-                        style: TextStyle(fontWeight: FontWeight.bold)),
+                    child: const Text('RESTART MATCH', style: TextStyle(fontWeight: FontWeight.bold)),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -284,8 +276,7 @@ class _CourtGameplayScreenState extends State<CourtGameplayScreen> {
                   width: double.infinity,
                   height: 48,
                   child: TextButton.icon(
-                    style: TextButton.styleFrom(
-                        foregroundColor: const Color(0xFFEF4444)),
+                    style: TextButton.styleFrom(foregroundColor: const Color(0xFFEF4444)),
                     onPressed: () {
                       Navigator.pushAndRemoveUntil(
                         context,
@@ -299,8 +290,7 @@ class _CourtGameplayScreenState extends State<CourtGameplayScreen> {
                       );
                     },
                     icon: const Icon(Icons.home, size: 20),
-                    label: const Text('QUIT TO LOBBY',
-                        style: TextStyle(fontWeight: FontWeight.bold)),
+                    label: const Text('QUIT TO LOBBY', style: TextStyle(fontWeight: FontWeight.bold)),
                   ),
                 ),
               ],
@@ -355,10 +345,12 @@ class _CourtGameplayScreenState extends State<CourtGameplayScreen> {
                   aiAnimState: aiAnimState,
                   playerFrame: playerFrame,
                   aiFrame: aiFrame,
+                  aimTargetX: aimTargetX,
+                  aimTargetY: aimTargetY,
+                  isAiming: isAiming,
                 ),
               ),
             ),
-
             Positioned.fill(
               child: Opacity(
                 opacity: 0.01,
@@ -366,7 +358,7 @@ class _CourtGameplayScreenState extends State<CourtGameplayScreen> {
               ),
             ),
 
-            // Header Bar
+            // Top Header Bar
             Positioned(
               top: 12,
               left: 12,
@@ -382,41 +374,28 @@ class _CourtGameplayScreenState extends State<CourtGameplayScreen> {
                     ],
                   ),
                   Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     decoration: BoxDecoration(
                       color: const Color(0xFF18181B),
                       borderRadius: BorderRadius.circular(12),
-                      border:
-                          Border.all(color: const Color(0xFFFACC15), width: 2),
+                      border: Border.all(color: const Color(0xFFFACC15), width: 2),
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.radio,
-                            color: Color(0xFFFACC15), size: 20),
+                        const Icon(Icons.radio, color: Color(0xFFFACC15), size: 20),
                         const SizedBox(width: 8),
                         Text(
                           '$playerScore - $opponentScore',
-                          style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 20,
-                              fontWeight: FontWeight.w900),
+                          style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900),
                         ),
                       ],
                     ),
                   ),
                   if (isDoublePointsActive)
                     Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                          color: const Color(0xFFEAB308),
-                          borderRadius: BorderRadius.circular(8)),
-                      child: const Text('💰 2X POINTS ACTIVE',
-                          style: TextStyle(
-                              color: Colors.black,
-                              fontWeight: FontWeight.w900,
-                              fontSize: 11)),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(color: const Color(0xFFEAB308), borderRadius: BorderRadius.circular(8)),
+                      child: const Text('2X POINTS ACTIVE', style: TextStyle(color: Colors.black, fontWeight: FontWeight.w900, fontSize: 11)),
                     )
                   else
                     const SizedBox(width: 40),
@@ -424,33 +403,29 @@ class _CourtGameplayScreenState extends State<CourtGameplayScreen> {
               ),
             ),
 
-            // Status Banner
+            // Match Status Banner
             Positioned(
               top: 68,
               left: 0,
               right: 0,
               child: Center(
                 child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                   decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.85),
+                    color: Colors.black.withValues(alpha: 0.85),
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(color: Colors.white24),
                   ),
                   child: Text(
                     matchStatus,
-                    style: const TextStyle(
-                        color: Color(0xFFFACC15),
-                        fontSize: 12,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 1.0),
+                    style: const TextStyle(color: Color(0xFFFACC15), fontSize: 12, fontWeight: FontWeight.w900, letterSpacing: 1.0),
                   ),
                 ),
               ),
             ),
 
             if (!isGameOver) ...[
+              // Left Joystick (Movement)
               Positioned(
                 left: 24,
                 bottom: 24,
@@ -460,6 +435,8 @@ class _CourtGameplayScreenState extends State<CourtGameplayScreen> {
                   },
                 ),
               ),
+
+              // Right Drag-and-Release Aiming Pad
               Positioned(
                 right: 20,
                 bottom: 20,
@@ -467,51 +444,32 @@ class _CourtGameplayScreenState extends State<CourtGameplayScreen> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    if (isPlayerServing)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: SizedBox(
-                          width: 130,
-                          height: 48,
-                          child: ElevatedButton.icon(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFFFACC15),
-                              foregroundColor: Colors.black,
-                              shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12)),
-                            ),
-                            onPressed: () => game.triggerAttack('SERVE'),
-                            icon: const Icon(Icons.sports_tennis, size: 20),
-                            label: const Text('SERVE',
-                                style: TextStyle(fontWeight: FontWeight.w900)),
-                          ),
-                        ),
-                      ),
+                    // Shot Type Toggle Row
                     Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        _buildStreetButton(
-                            label: 'SLICE',
-                            onPressed: () => game.triggerAttack('ROLL')),
-                        const SizedBox(width: 12),
-                        _buildStreetButton(
-                            label: 'DRIVE',
-                            onPressed: () => game.triggerAttack('DRIVE'),
-                            isPrimary: true),
+                        _buildShotTypeChip('DRIVE'),
+                        const SizedBox(width: 6),
+                        _buildShotTypeChip('SLICE'),
+                        const SizedBox(width: 6),
+                        _buildShotTypeChip('SMASH'),
+                        const SizedBox(width: 6),
+                        _buildShotTypeChip('LOB'),
                       ],
                     ),
-                    const SizedBox(height: 8),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        _buildStreetButton(
-                            label: 'LOB',
-                            onPressed: () => game.triggerAttack('LOB')),
-                        const SizedBox(width: 12),
-                        _buildStreetButton(
-                            label: 'SMASH',
-                            onPressed: () => game.triggerAttack('SMASH')),
-                      ],
+                    const SizedBox(height: 10),
+                    // Drag Attack Pad
+                    DragAttackJoystick(
+                      selectedShotType: selectedShotType,
+                      onAimUpdated: (Offset aimNormalized) {
+                        game.updateAim(aimNormalized);
+                      },
+                      onReleaseAttack: (Offset releaseNormalized) {
+                        game.triggerDragAttack(releaseNormalized, selectedShotType);
+                      },
+                      onCancelAim: () {
+                        game.cancelAim();
+                      },
                     ),
                   ],
                 ),
@@ -523,12 +481,35 @@ class _CourtGameplayScreenState extends State<CourtGameplayScreen> {
     );
   }
 
+  Widget _buildShotTypeChip(String type) {
+    final bool isSelected = selectedShotType == type;
+    return GestureDetector(
+      onTap: () => setState(() => selectedShotType = type),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFFFACC15) : const Color(0xFF27272A),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: isSelected ? Colors.white : Colors.white24),
+        ),
+        child: Text(
+          type,
+          style: TextStyle(
+            color: isSelected ? Colors.black : Colors.white,
+            fontSize: 10,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildHeaderIconButton(IconData icon, VoidCallback onPressed) {
     return Container(
       width: 40,
       height: 40,
       decoration: BoxDecoration(
-        color: const Color(0xFF18181B).withOpacity(0.8),
+        color: const Color(0xFF18181B).withValues(alpha: 0.8),
         shape: BoxShape.circle,
         border: Border.all(color: const Color(0xFFFACC15), width: 1.5),
       ),
@@ -539,38 +520,10 @@ class _CourtGameplayScreenState extends State<CourtGameplayScreen> {
       ),
     );
   }
-
-  Widget _buildStreetButton(
-      {required String label,
-      required VoidCallback onPressed,
-      bool isPrimary = false}) {
-    return GestureDetector(
-      onTap: onPressed,
-      child: Container(
-        width: isPrimary ? 72 : 64,
-        height: isPrimary ? 72 : 64,
-        decoration: BoxDecoration(
-          color: isPrimary ? const Color(0xFFDC2626) : const Color(0xFF27272A),
-          shape: BoxShape.circle,
-          border: Border.all(
-              color: isPrimary ? const Color(0xFFFACC15) : Colors.white38,
-              width: 2.5),
-        ),
-        child: Center(
-          child: Text(
-            label,
-            style: const TextStyle(
-                color: Colors.white, fontWeight: FontWeight.w900, fontSize: 11),
-          ),
-        ),
-      ),
-    );
-  }
 }
 
 class TouchJoystickWheel extends StatefulWidget {
   final Function(Offset direction) onJoystickMoved;
-
   const TouchJoystickWheel({super.key, required this.onJoystickMoved});
 
   @override
@@ -585,7 +538,6 @@ class _TouchJoystickWheelState extends State<TouchJoystickWheel> {
   void _updatePosition(Offset offset) {
     final double distance = offset.distance;
     final double maxDistance = _baseRadius - _knobRadius;
-
     Offset clampedOffset = offset;
     if (distance > maxDistance) {
       clampedOffset = Offset(
@@ -593,7 +545,6 @@ class _TouchJoystickWheelState extends State<TouchJoystickWheel> {
         (offset.dy / distance) * maxDistance,
       );
     }
-
     setState(() {
       _dragPosition = clampedOffset;
     });
@@ -615,10 +566,8 @@ class _TouchJoystickWheelState extends State<TouchJoystickWheel> {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onPanStart: (details) => _updatePosition(
-          details.localPosition - Offset(_baseRadius, _baseRadius)),
-      onPanUpdate: (details) => _updatePosition(
-          details.localPosition - Offset(_baseRadius, _baseRadius)),
+      onPanStart: (details) => _updatePosition(details.localPosition - Offset(_baseRadius, _baseRadius)),
+      onPanUpdate: (details) => _updatePosition(details.localPosition - Offset(_baseRadius, _baseRadius)),
       onPanEnd: (_) => _resetPosition(),
       onPanCancel: () => _resetPosition(),
       child: Container(
@@ -626,7 +575,7 @@ class _TouchJoystickWheelState extends State<TouchJoystickWheel> {
         height: _baseRadius * 2,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: const Color(0xFF18181B).withOpacity(0.80),
+          color: const Color(0xFF18181B).withValues(alpha: 0.80),
           border: Border.all(color: const Color(0xFFFACC15), width: 2.5),
         ),
         child: Stack(
@@ -641,8 +590,115 @@ class _TouchJoystickWheelState extends State<TouchJoystickWheel> {
                   shape: BoxShape.circle,
                   color: Color(0xFFFACC15),
                 ),
-                child:
-                    const Icon(Icons.navigation, size: 16, color: Colors.black),
+                child: const Icon(Icons.navigation, size: 16, color: Colors.black),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Attack Drag-and-Release Aim Pad Component
+class DragAttackJoystick extends StatefulWidget {
+  final String selectedShotType;
+  final Function(Offset aimNormalized) onAimUpdated;
+  final Function(Offset releaseNormalized) onReleaseAttack;
+  final VoidCallback onCancelAim;
+
+  const DragAttackJoystick({
+    super.key,
+    required this.selectedShotType,
+    required this.onAimUpdated,
+    required this.onReleaseAttack,
+    required this.onCancelAim,
+  });
+
+  @override
+  State<DragAttackJoystick> createState() => _DragAttackJoystickState();
+}
+
+class _DragAttackJoystickState extends State<DragAttackJoystick> {
+  Offset _dragPosition = Offset.zero;
+  final double _baseRadius = 60.0;
+  final double _knobRadius = 24.0;
+
+  void _updatePosition(Offset offset) {
+    final double distance = offset.distance;
+    final double maxDistance = _baseRadius - _knobRadius;
+    Offset clampedOffset = offset;
+    if (distance > maxDistance) {
+      clampedOffset = Offset(
+        (offset.dx / distance) * maxDistance,
+        (offset.dy / distance) * maxDistance,
+      );
+    }
+    setState(() {
+      _dragPosition = clampedOffset;
+    });
+
+    final normalized = Offset(
+      clampedOffset.dx / maxDistance,
+      clampedOffset.dy / maxDistance,
+    );
+    widget.onAimUpdated(normalized);
+  }
+
+  void _onRelease() {
+    final double maxDistance = _baseRadius - _knobRadius;
+    final normalized = Offset(
+      _dragPosition.dx / maxDistance,
+      _dragPosition.dy / maxDistance,
+    );
+    widget.onReleaseAttack(normalized);
+    setState(() {
+      _dragPosition = Offset.zero;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onPanStart: (details) => _updatePosition(details.localPosition - Offset(_baseRadius, _baseRadius)),
+      onPanUpdate: (details) => _updatePosition(details.localPosition - Offset(_baseRadius, _baseRadius)),
+      onPanEnd: (_) => _onRelease(),
+      onPanCancel: () {
+        setState(() => _dragPosition = Offset.zero);
+        widget.onCancelAim();
+      },
+      child: Container(
+        width: _baseRadius * 2,
+        height: _baseRadius * 2,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: const Color(0xFFDC2626).withValues(alpha: 0.85),
+          border: Border.all(color: const Color(0xFFFACC15), width: 3.0),
+          boxShadow: [
+            BoxShadow(color: const Color(0xFFDC2626).withValues(alpha: 0.35), blurRadius: 16),
+          ],
+        ),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            const Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.gps_fixed, color: Colors.white70, size: 22),
+                SizedBox(height: 2),
+                Text('DRAG AIM', style: TextStyle(color: Colors.white, fontSize: 8.5, fontWeight: FontWeight.w900)),
+              ],
+            ),
+            Transform.translate(
+              offset: _dragPosition,
+              child: Container(
+                width: _knobRadius * 2,
+                height: _knobRadius * 2,
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Color(0xFFFACC15),
+                ),
+                child: const Icon(Icons.sports_tennis, size: 16, color: Colors.black),
               ),
             ),
           ],

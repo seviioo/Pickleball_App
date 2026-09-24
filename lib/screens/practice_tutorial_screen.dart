@@ -97,7 +97,7 @@ class _PracticeTutorialScreenState extends State<PracticeTutorialScreen> {
                 Expanded(
                   child: StreetCard(
                     padding: const EdgeInsets.all(24),
-                    borderColor: AppColors.gold.withOpacity(0.3),
+                    borderColor: AppColors.gold.withValues(alpha: 0.3),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [

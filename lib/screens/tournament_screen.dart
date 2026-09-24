@@ -81,13 +81,13 @@ class _TournamentScreenState extends State<TournamentScreen> {
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [
-                        AppColors.gold.withOpacity(0.16),
+                        AppColors.gold.withValues(alpha: 0.16),
                         AppColors.surface,
                       ],
                     ),
                     borderRadius: BorderRadius.circular(18),
                     border: Border.all(
-                        color: AppColors.gold.withOpacity(0.5), width: 1.4),
+                        color: AppColors.gold.withValues(alpha: 0.5), width: 1.4),
                   ),
                   child: Row(
                     children: [
@@ -99,7 +99,7 @@ class _TournamentScreenState extends State<TournamentScreen> {
                           borderRadius: BorderRadius.circular(14),
                           boxShadow: [
                             BoxShadow(
-                                color: AppColors.gold.withOpacity(0.4),
+                                color: AppColors.gold.withValues(alpha: 0.4),
                                 blurRadius: 14),
                           ],
                         ),
@@ -172,7 +172,7 @@ class _TournamentScreenState extends State<TournamentScreen> {
                                           ? [
                                               BoxShadow(
                                                   color: AppColors.red
-                                                      .withOpacity(0.45),
+                                                      .withValues(alpha: 0.45),
                                                   blurRadius: 10),
                                             ]
                                           : null,
@@ -198,7 +198,7 @@ class _TournamentScreenState extends State<TournamentScreen> {
                                         margin: const EdgeInsets.symmetric(
                                             vertical: 4),
                                         color: isDone
-                                            ? AppColors.gold.withOpacity(0.6)
+                                            ? AppColors.gold.withValues(alpha: 0.6)
                                             : AppColors.hairline,
                                       ),
                                     ),
@@ -221,7 +221,7 @@ class _TournamentScreenState extends State<TournamentScreen> {
                                         ? [
                                             BoxShadow(
                                                 color: AppColors.red
-                                                    .withOpacity(0.18),
+                                                    .withValues(alpha: 0.18),
                                                 blurRadius: 16,
                                                 offset: const Offset(0, 6)),
                                           ]
@@ -300,7 +300,7 @@ class _TournamentScreenState extends State<TournamentScreen> {
                                         if (isCurrent)
                                           Container(
                                             padding: const EdgeInsets.all(9),
-                                            decoration: BoxDecoration(
+                                            decoration: const BoxDecoration(
                                               gradient: AppColors.redButton,
                                               shape: BoxShape.circle,
                                             ),

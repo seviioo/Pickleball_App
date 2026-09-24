@@ -73,7 +73,7 @@ class _EquipmentScreenState extends State<EquipmentScreen> {
                 decoration: BoxDecoration(
                   color: AppColors.surface,
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppColors.gold.withOpacity(0.35)),
+                  border: Border.all(color: AppColors.gold.withValues(alpha: 0.35)),
                 ),
                 child: Row(
                   children: [
@@ -110,7 +110,7 @@ class _EquipmentScreenState extends State<EquipmentScreen> {
                 shadows: isEquipped
                     ? [
                         BoxShadow(
-                            color: AppColors.gold.withOpacity(0.18),
+                            color: AppColors.gold.withValues(alpha: 0.18),
                             blurRadius: 18,
                             offset: const Offset(0, 6)),
                       ]
@@ -124,7 +124,7 @@ class _EquipmentScreenState extends State<EquipmentScreen> {
                         gradient: isEquipped
                             ? LinearGradient(
                                 colors: [
-                                  AppColors.gold.withOpacity(0.14),
+                                  AppColors.gold.withValues(alpha: 0.14),
                                   Colors.transparent,
                                 ],
                               )
@@ -177,7 +177,7 @@ class _EquipmentScreenState extends State<EquipmentScreen> {
                                       letterSpacing: 0.4)),
                             )
                           else if (!paddle.isUnlocked)
-                            Icon(Icons.lock_rounded,
+                            const Icon(Icons.lock_rounded,
                                 color: AppColors.textFaint, size: 18),
                         ],
                       ),

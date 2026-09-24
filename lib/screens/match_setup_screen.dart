@@ -38,12 +38,12 @@ class _MatchSetupScreenState extends State<MatchSetupScreen> {
               children: [
                 // Player & Equipment Summary
                 StreetCard(
-                  borderColor: AppColors.gold.withOpacity(0.35),
+                  borderColor: AppColors.gold.withValues(alpha: 0.35),
                   child: Row(
                     children: [
                       Container(
                         padding: const EdgeInsets.all(2.5),
-                        decoration: BoxDecoration(
+                        decoration: const BoxDecoration(
                           shape: BoxShape.circle,
                           gradient: AppColors.goldButton,
                         ),
@@ -183,7 +183,7 @@ class _MatchSetupScreenState extends State<MatchSetupScreen> {
             boxShadow: isSelected
                 ? [
                     BoxShadow(
-                        color: AppColors.gold.withOpacity(0.3),
+                        color: AppColors.gold.withValues(alpha: 0.3),
                         blurRadius: 14,
                         offset: const Offset(0, 6)),
                   ]
@@ -230,7 +230,7 @@ class _MatchSetupScreenState extends State<MatchSetupScreen> {
         duration: const Duration(milliseconds: 180),
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: isSelected ? color.withOpacity(0.10) : AppColors.surface,
+          color: isSelected ? color.withValues(alpha: 0.10) : AppColors.surface,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: isSelected ? color : AppColors.hairline,
@@ -243,7 +243,7 @@ class _MatchSetupScreenState extends State<MatchSetupScreen> {
               width: 42,
               height: 42,
               decoration: BoxDecoration(
-                color: color.withOpacity(0.15),
+                color: color.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(icon, color: color, size: 22),

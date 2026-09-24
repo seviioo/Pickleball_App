@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../game/pickleball_game.dart';
+import 'dart:math';
 
 class PerspectiveCourtPainter extends CustomPainter {
   final double ballX;
@@ -21,6 +22,9 @@ class PerspectiveCourtPainter extends CustomPainter {
   final CharacterAnimState aiAnimState;
   final int playerFrame;
   final int aiFrame;
+  final double? aimTargetX;
+  final double? aimTargetY;
+  final bool isAiming;
 
   PerspectiveCourtPainter({
     required this.ballX,
@@ -42,6 +46,9 @@ class PerspectiveCourtPainter extends CustomPainter {
     required this.aiAnimState,
     required this.playerFrame,
     required this.aiFrame,
+    this.aimTargetX,
+    this.aimTargetY,
+    this.isAiming = false,
   });
 
   @override
@@ -51,12 +58,12 @@ class PerspectiveCourtPainter extends CustomPainter {
       ..style = PaintingStyle.fill;
     canvas.drawRect(Offset.zero & size, darkAsphaltPaint);
 
-    final streetGradient = LinearGradient(
+    const streetGradient = LinearGradient(
       begin: Alignment.topCenter,
       end: Alignment.bottomCenter,
       colors: [
-        const Color(0xFF18181B),
-        const Color(0xFF09090B),
+        Color(0xFF18181B),
+        Color(0xFF09090B),
       ],
     );
     canvas.drawRect(
@@ -80,14 +87,10 @@ class PerspectiveCourtPainter extends CustomPainter {
 
     // Court Surface
     final Path courtPath = Path()
-      ..moveTo(perspectiveTransform(-1.0, -1.0).dx,
-          perspectiveTransform(-1.0, -1.0).dy)
-      ..lineTo(perspectiveTransform(1.0, -1.0).dx,
-          perspectiveTransform(-1.0, -1.0).dy)
-      ..lineTo(
-          perspectiveTransform(1.0, 1.0).dx, perspectiveTransform(1.0, 1.0).dy)
-      ..lineTo(perspectiveTransform(-1.0, 1.0).dx,
-          perspectiveTransform(-1.0, 1.0).dy)
+      ..moveTo(perspectiveTransform(-1.0, -1.0).dx, perspectiveTransform(-1.0, -1.0).dy)
+      ..lineTo(perspectiveTransform(1.0, -1.0).dx, perspectiveTransform(1.0, -1.0).dy)
+      ..lineTo(perspectiveTransform(1.0, 1.0).dx, perspectiveTransform(1.0, 1.0).dy)
+      ..lineTo(perspectiveTransform(-1.0, 1.0).dx, perspectiveTransform(-1.0, 1.0).dy)
       ..close();
 
     canvas.drawPath(
@@ -99,14 +102,10 @@ class PerspectiveCourtPainter extends CustomPainter {
 
     // Kitchen (NVZ) Surface
     final Path kitchenPath = Path()
-      ..moveTo(perspectiveTransform(-1.0, -0.32).dx,
-          perspectiveTransform(-1.0, -0.32).dy)
-      ..lineTo(perspectiveTransform(1.0, -0.32).dx,
-          perspectiveTransform(1.0, -0.32).dy)
-      ..lineTo(perspectiveTransform(1.0, 0.32).dx,
-          perspectiveTransform(1.0, 0.32).dy)
-      ..lineTo(perspectiveTransform(-1.0, 0.32).dx,
-          perspectiveTransform(-1.0, 0.32).dy)
+      ..moveTo(perspectiveTransform(-1.0, -0.32).dx, perspectiveTransform(-1.0, -0.32).dy)
+      ..lineTo(perspectiveTransform(1.0, -0.32).dx, perspectiveTransform(1.0, -0.32).dy)
+      ..lineTo(perspectiveTransform(1.0, 0.32).dx, perspectiveTransform(1.0, 0.32).dy)
+      ..lineTo(perspectiveTransform(-1.0, 0.32).dx, perspectiveTransform(-1.0, 0.32).dy)
       ..close();
 
     canvas.drawPath(
@@ -123,23 +122,62 @@ class PerspectiveCourtPainter extends CustomPainter {
       ..style = PaintingStyle.stroke;
 
     canvas.drawPath(courtPath, linePaint);
+
     Offset netLeft = perspectiveTransform(-1.0, 0.0);
     Offset netRight = perspectiveTransform(1.0, 0.0);
+
     canvas.drawLine(netLeft, netRight, linePaint);
-    canvas.drawLine(perspectiveTransform(-1.0, -0.32),
-        perspectiveTransform(1.0, -0.32), linePaint);
-    canvas.drawLine(perspectiveTransform(-1.0, 0.32),
-        perspectiveTransform(1.0, 0.32), linePaint);
-    canvas.drawLine(perspectiveTransform(0.0, -1.0),
-        perspectiveTransform(0.0, -0.32), linePaint);
-    canvas.drawLine(perspectiveTransform(0.0, 0.32),
-        perspectiveTransform(0.0, 1.0), linePaint);
+    canvas.drawLine(perspectiveTransform(-1.0, -0.32), perspectiveTransform(1.0, -0.32), linePaint);
+    canvas.drawLine(perspectiveTransform(-1.0, 0.32), perspectiveTransform(1.0, 0.32), linePaint);
+    canvas.drawLine(perspectiveTransform(0.0, -1.0), perspectiveTransform(0.0, -0.32), linePaint);
+    canvas.drawLine(perspectiveTransform(0.0, 0.32), perspectiveTransform(0.0, 1.0), linePaint);
+
+    // Dynamic Aim Direction & Trajectory Preview
+    if (isAiming && aimTargetX != null && aimTargetY != null) {
+      Offset playerPos = perspectiveTransform(playerX, playerY);
+      Offset targetPos = perspectiveTransform(aimTargetX!, aimTargetY!);
+
+      final Paint trajectoryPaint = Paint()
+        ..color = const Color(0xFFFACC15)
+        ..strokeWidth = 3.0
+        ..style = PaintingStyle.stroke;
+
+      double dx = targetPos.dx - playerPos.dx;
+      double dy = targetPos.dy - playerPos.dy;
+      int segments = 12;
+
+      for (int i = 0; i < segments; i += 2) {
+        double startRatio = i / segments;
+        double endRatio = (i + 1) / segments;
+        canvas.drawLine(
+          Offset(playerPos.dx + dx * startRatio, playerPos.dy + dy * startRatio),
+          Offset(playerPos.dx + dx * endRatio, playerPos.dy + dy * endRatio),
+          trajectoryPaint,
+        );
+      }
+
+      canvas.drawCircle(
+        targetPos,
+        14,
+        Paint()
+          ..color = const Color(0xFFFACC15).withValues(alpha: 0.35)
+          ..style = PaintingStyle.fill,
+      );
+      canvas.drawCircle(
+        targetPos,
+        14,
+        Paint()
+          ..color = const Color(0xFFFACC15)
+          ..strokeWidth = 2.0
+          ..style = PaintingStyle.stroke,
+      );
+      canvas.drawCircle(targetPos, 4, Paint()..color = const Color(0xFFEF4444));
+    }
 
     // Net Mesh
     final double netHeightPx = size.height * 0.075;
     final Offset netTopLeft = Offset(netLeft.dx - 3, netLeft.dy - netHeightPx);
-    final Offset netTopRight =
-        Offset(netRight.dx + 3, netRight.dy - netHeightPx);
+    final Offset netTopRight = Offset(netRight.dx + 3, netRight.dy - netHeightPx);
 
     final Path netMeshPath = Path()
       ..moveTo(netLeft.dx, netLeft.dy)
@@ -148,8 +186,7 @@ class PerspectiveCourtPainter extends CustomPainter {
       ..lineTo(netTopLeft.dx, netTopLeft.dy)
       ..close();
 
-    canvas.drawPath(
-        netMeshPath, Paint()..color = Colors.black.withOpacity(0.55));
+    canvas.drawPath(netMeshPath, Paint()..color = Colors.black.withValues(alpha: 0.55));
     canvas.drawLine(
       netTopLeft,
       netTopRight,
@@ -163,10 +200,9 @@ class PerspectiveCourtPainter extends CustomPainter {
       ..color = const Color(0xFF71717A)
       ..strokeWidth = 6.0
       ..strokeCap = StrokeCap.round;
-    canvas.drawLine(netLeft,
-        Offset(netLeft.dx - 2, netLeft.dy - netHeightPx * 1.05), postPaint);
-    canvas.drawLine(netRight,
-        Offset(netRight.dx + 2, netRight.dy - netHeightPx * 1.05), postPaint);
+
+    canvas.drawLine(netLeft, Offset(netLeft.dx - 2, netLeft.dy - netHeightPx * 1.05), postPaint);
+    canvas.drawLine(netRight, Offset(netRight.dx + 2, netRight.dy - netHeightPx * 1.05), postPaint);
 
     // Power Orbs
     if (orbX != null && orbY != null && orbType != null) {
@@ -179,7 +215,7 @@ class PerspectiveCourtPainter extends CustomPainter {
         orbPos,
         18,
         Paint()
-          ..color = orbColor.withOpacity(0.4)
+          ..color = orbColor.withValues(alpha: 0.4)
           ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8),
       );
       canvas.drawCircle(orbPos, 12, Paint()..color = orbColor);
@@ -212,49 +248,46 @@ class PerspectiveCourtPainter extends CustomPainter {
       frame: playerFrame,
     );
 
-    // Pickleball & Shadow
+    // Pseudo-3D Depth Scaling Calculation for the Ball
     Offset ballCourtPos = perspectiveTransform(ballX, ballY);
-    double renderBallY = ballCourtPos.dy - (ballHeight * 60.0);
+    double depthScale = 0.45 + ((ballY + 1.0) / 2.0) * 0.55; 
+    depthScale = depthScale.clamp(0.3, 1.2); 
+
+    double renderBallY = ballCourtPos.dy - (ballHeight * 60.0 * depthScale);
     final Offset ballCenter = Offset(ballCourtPos.dx, renderBallY);
 
-    double shadowWidth = (20.0 - ballHeight * 6.0).clamp(6.0, 20.0);
-    double shadowHeight = (10.0 - ballHeight * 3.0).clamp(3.0, 10.0);
+    double shadowWidth = (20.0 - ballHeight * 6.0).clamp(6.0, 20.0) * depthScale;
+    double shadowHeight = (10.0 - ballHeight * 3.0).clamp(3.0, 10.0) * depthScale;
+
     canvas.drawOval(
-      Rect.fromCenter(
-          center: ballCourtPos, width: shadowWidth, height: shadowHeight),
+      Rect.fromCenter(center: ballCourtPos, width: shadowWidth, height: shadowHeight),
       Paint()..color = Colors.black54,
     );
 
-    Color ballColor = isDoublePointsActive
-        ? const Color(0xFFEAB308)
-        : const Color(0xFFFACC15);
-    canvas.drawCircle(ballCenter, 9.0, Paint()..color = ballColor);
+    Color ballColor = isDoublePointsActive ? const Color(0xFFEAB308) : const Color(0xFFFACC15);
+    canvas.drawCircle(ballCenter, 9.0 * depthScale, Paint()..color = ballColor);
 
     final Paint holePaint = Paint()..color = Colors.black45;
-    canvas.drawCircle(
-        Offset(ballCenter.dx - 2, ballCenter.dy - 2), 1.0, holePaint);
-    canvas.drawCircle(
-        Offset(ballCenter.dx + 2, ballCenter.dy - 1), 1.0, holePaint);
-    canvas.drawCircle(Offset(ballCenter.dx, ballCenter.dy + 2), 1.0, holePaint);
+    canvas.drawCircle(Offset(ballCenter.dx - 2 * depthScale, ballCenter.dy - 2 * depthScale), 1.0 * depthScale, holePaint);
+    canvas.drawCircle(Offset(ballCenter.dx + 2 * depthScale, ballCenter.dy - 1 * depthScale), 1.0 * depthScale, holePaint);
+    canvas.drawCircle(Offset(ballCenter.dx, ballCenter.dy + 2 * depthScale), 1.0 * depthScale, holePaint);
 
     if (timingFeedback != null && timingFeedback!.isNotEmpty) {
+      Color feedbackColor = timingFeedback == 'WHIFF!' ? const Color(0xFFDC2626) : const Color(0xFFFACC15);
       final textSpan = TextSpan(
         text: timingFeedback,
-        style: const TextStyle(
-          color: Color(0xFFFACC15),
+        style: TextStyle(
+          color: feedbackColor,
           fontSize: 22,
           fontWeight: FontWeight.w900,
           fontStyle: FontStyle.italic,
-          shadows: [
-            Shadow(offset: Offset(1.5, 1.5), color: Colors.black, blurRadius: 4)
+          shadows: const [
+            Shadow(offset: Offset(1.5, 1.5), color: Colors.black, blurRadius: 4),
           ],
         ),
       );
-      final textPainter =
-          TextPainter(text: textSpan, textDirection: TextDirection.ltr)
-            ..layout();
-      textPainter.paint(canvas,
-          Offset(playerPos.dx - textPainter.width / 2, playerPos.dy - 85));
+      final textPainter = TextPainter(text: textSpan, textDirection: TextDirection.ltr)..layout();
+      textPainter.paint(canvas, Offset(playerPos.dx - textPainter.width / 2, playerPos.dy - 85));
     }
   }
 
@@ -275,19 +308,15 @@ class PerspectiveCourtPainter extends CustomPainter {
 
     final Paint skinPaint = Paint()..color = const Color(0xFFFDBA74);
 
-    // Directional Leg Cycling Animations
     double legOffsetLeft = (frame % 2 == 0) ? -3.0 : 3.0;
     double legOffsetRight = (frame % 2 == 0) ? 3.0 : -3.0;
-
     if (animState == CharacterAnimState.idle) {
       legOffsetLeft = 0;
       legOffsetRight = 0;
     }
 
-    // Legs
     canvas.drawRRect(
-      RRect.fromLTRBR(
-          -8, -12 + legOffsetLeft, -3, -2, const Radius.circular(2)),
+      RRect.fromLTRBR(-8, -12 + legOffsetLeft, -3, -2, const Radius.circular(2)),
       skinPaint,
     );
     canvas.drawRRect(
@@ -295,7 +324,6 @@ class PerspectiveCourtPainter extends CustomPainter {
       skinPaint,
     );
 
-    // Shorts & Shirt
     canvas.drawRRect(
       RRect.fromLTRBR(-10, -22, 10, -10, const Radius.circular(4)),
       Paint()..color = const Color(0xFF18181B),
@@ -305,7 +333,6 @@ class PerspectiveCourtPainter extends CustomPainter {
       Paint()..color = shirtColor,
     );
 
-    // Head
     canvas.drawCircle(const Offset(0, -50), 16, skinPaint);
     canvas.drawArc(
       Rect.fromCircle(center: const Offset(0, -54), radius: 17),
@@ -315,9 +342,7 @@ class PerspectiveCourtPainter extends CustomPainter {
       Paint()..color = const Color(0xFF27272A),
     );
 
-    // Contextual Shot & Paddle Angles
-    Offset paddleHand =
-        isPlayer ? const Offset(14, -28) : const Offset(-14, -28);
+    Offset paddleHand = isPlayer ? const Offset(14, -28) : const Offset(-14, -28);
     double paddleAngle = 0.0;
     double paddleScale = isShrunk ? 0.5 : 1.0;
 
@@ -355,11 +380,9 @@ class PerspectiveCourtPainter extends CustomPainter {
         Rect.fromCenter(center: Offset.zero, width: 14, height: 18),
         const Radius.circular(4),
       ),
-      Paint()
-        ..color = isGlowing ? const Color(0xFFF97316) : const Color(0xFFEF4444),
+      Paint()..color = isGlowing ? const Color(0xFFF97316) : const Color(0xFFEF4444),
     );
     canvas.restore();
-
     canvas.restore();
   }
 

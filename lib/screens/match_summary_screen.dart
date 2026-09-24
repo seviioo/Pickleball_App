@@ -81,7 +81,7 @@ class _MatchSummaryScreenState extends State<MatchSummaryScreen> {
                   borderWidth: 1.8,
                   shadows: [
                     BoxShadow(
-                        color: accent.withOpacity(0.28),
+                        color: accent.withValues(alpha: 0.28),
                         blurRadius: 32,
                         offset: const Offset(0, 12)),
                   ],
@@ -97,7 +97,7 @@ class _MatchSummaryScreenState extends State<MatchSummaryScreen> {
                               : AppColors.redButton,
                           boxShadow: [
                             BoxShadow(
-                                color: accent.withOpacity(0.4), blurRadius: 26),
+                                color: accent.withValues(alpha: 0.4), blurRadius: 26),
                           ],
                         ),
                         child: Icon(

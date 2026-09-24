@@ -44,6 +44,9 @@ typedef GameStateCallback = void Function({
   required CharacterAnimState aiAnimState,
   required int playerFrame,
   required int aiFrame,
+  double? aimTargetX,
+  double? aimTargetY,
+  required bool isAiming,
 });
 
 enum RallyPhase { readyToServe, inFlight, activeRally }
@@ -62,7 +65,6 @@ class PickleballGame extends FlameGame {
   bool isGameOver = false;
   String matchStatus = 'STREET SERVE READY';
   String? timingFeedback;
-
   RallyPhase phase = RallyPhase.readyToServe;
 
   double ultimateGauge = 0.0;
@@ -71,7 +73,6 @@ class PickleballGame extends FlameGame {
   double ballX = 0.0;
   double ballY = 0.85;
   double ballHeight = 0.40;
-
   double ballVx = 0.0;
   double ballVy = 0.0;
   double ballVz = 0.0;
@@ -80,6 +81,17 @@ class PickleballGame extends FlameGame {
   double playerY = 0.85;
   double opponentX = 0.0;
   double opponentY = -0.85;
+
+  // Aiming State Variables
+  double? aimTargetX;
+  double? aimTargetY;
+  bool isAiming = false;
+  double _playerLockoutTimer = 0.0;
+
+  // AI State Machine Variables
+  double _aiReactionTimer = 0.0;
+  double _aiTargetX = 0.0;
+  double _aiTargetY = -0.85;
 
   // Animation States
   CharacterAnimState playerAnimState = CharacterAnimState.idle;
@@ -96,14 +108,12 @@ class PickleballGame extends FlameGame {
   double? orbY;
   OrbType? orbType;
   double _orbSpawnTimer = 0.0;
-
   bool isDoublePointsActive = false;
   double _aiShrinkTimer = 0.0;
 
   Offset playerInputDir = Offset.zero;
   double _aiServeTimer = 0.0;
   int _bounceCount = 0;
-
   static const double gravity = 3.5;
 
   PickleballGame({
@@ -131,22 +141,22 @@ class PickleballGame extends FlameGame {
     orbY = null;
     orbType = null;
     _aiShrinkTimer = 0.0;
-
     playerX = 0.0;
     playerY = 0.85;
     opponentX = 0.0;
     opponentY = -0.85;
-
+    isAiming = false;
+    aimTargetX = null;
+    aimTargetY = null;
+    _playerLockoutTimer = 0.0;
+    _aiReactionTimer = 0.0;
     playerAnimState = CharacterAnimState.idle;
     aiAnimState = CharacterAnimState.idle;
-
     _snapBallToServerHand();
-
     ballVx = 0.0;
     ballVy = 0.0;
     ballVz = 0.0;
-
-    matchStatus = isPlayerServing ? 'YOUR SERVE' : 'AI SERVING...';
+    matchStatus = isPlayerServing ? 'YOUR SERVE (DRAG TO AIM)' : 'AI SERVING...';
     _notifyState();
   }
 
@@ -166,51 +176,75 @@ class PickleballGame extends FlameGame {
     playerInputDir = dir;
   }
 
-  void triggerAttack(String shotType) {
+  void updateAim(Offset dragNormalized) {
     if (isGameOver) return;
+    isAiming = true;
+    aimTargetX = (dragNormalized.dx * 0.95).clamp(-0.95, 0.95);
+    aimTargetY = (-0.60 + dragNormalized.dy * 0.35).clamp(-0.90, -0.30);
+    _notifyState();
+  }
+
+  void triggerDragAttack(Offset releaseNormalized, String shotType) {
+    if (isGameOver) return;
+    isAiming = false;
+
+    double targetX = aimTargetX ?? (releaseNormalized.dx * 0.85).clamp(-0.90, 0.90);
+    double targetY = aimTargetY ?? (-0.60 + releaseNormalized.dy * 0.30).clamp(-0.85, -0.35);
+
+    aimTargetX = null;
+    aimTargetY = null;
 
     if (phase == RallyPhase.readyToServe && isPlayerServing) {
-      _executePlayerServe();
+      _executePlayerServe(targetX, targetY);
       return;
     }
 
-    if (ballVy > 0 || ballY > -0.2) {
-      double dist = sqrt(pow(ballX - playerX, 2) + pow(ballY - playerY, 2));
-      if (dist <= 0.65) {
-        _executePlayerHit(shotType);
-      } else {
-        timingFeedback = 'TOO FAR!';
-        _clearTimingFeedback();
-      }
+    double dist = sqrt(pow(ballX - playerX, 2) + pow(ballY - playerY, 2));
+    
+    // Tighter hit proximity (Reduced from 0.70 to 0.35)
+    if (dist <= 0.35) {
+      _executePlayerHit(shotType, targetX, targetY);
+    } else {
+      timingFeedback = 'WHIFF!';
+      playerAnimState = CharacterAnimState.smash;
+      playerAnimTimer = 0.4;
+      _playerLockoutTimer = 0.4;
+      _clearTimingFeedback();
+      _notifyState();
     }
   }
 
-  void _executePlayerServe() {
+  void cancelAim() {
+    isAiming = false;
+    aimTargetX = null;
+    aimTargetY = null;
+    _notifyState();
+  }
+
+  void _executePlayerServe(double targetX, double targetY) {
     phase = RallyPhase.inFlight;
     _bounceCount = 0;
-
     ballX = playerX;
     ballY = playerY;
     ballHeight = 0.45;
 
-    double targetX = (Random().nextDouble() - 0.5) * 0.5;
-    double targetY = -0.65;
     double airTime = 1.35;
-
     ballVx = (targetX - playerX) / airTime;
     ballVy = (targetY - playerY) / airTime;
     ballVz = 0.5 * gravity * airTime;
 
     playerAnimState = CharacterAnimState.serving;
     playerAnimTimer = 0.35;
-
     matchStatus = 'SERVE IN PLAY';
-    timingFeedback = 'STREET SERVE!';
+    timingFeedback = 'AIMED SERVE!';
+    
+    _aiReactionTimer = (0.50 - (aiDupr * 0.05)).clamp(0.15, 0.4);
+    
     AudioService.playShotSfx('DRIVE');
     _clearTimingFeedback();
   }
 
-  void _executePlayerHit(String shotType) {
+  void _executePlayerHit(String shotType, double targetX, double targetY) {
     if (playerY < 0.32 && ballHeight > 0.20) {
       matchStatus = 'KITCHEN FAULT! POINT TO AI';
       AudioService.playFaultSfx();
@@ -225,50 +259,36 @@ class PickleballGame extends FlameGame {
       ultimateGauge = (ultimateGauge + 0.20).clamp(0.0, 1.0);
     }
 
-    double targetX = (Random().nextDouble() - 0.5) * 0.7;
-    double targetY = -0.72;
     double airTime = 1.30;
-
     if (shotType == 'ULTIMATE' || isUltimateActive) {
       isUltimateActive = true;
-      targetY = -0.85;
       airTime = 0.85;
       playerAnimState = CharacterAnimState.smash;
-      timingFeedback = '⚡ STREET OVERDRIVE!';
+      timingFeedback = 'STREET OVERDRIVE!';
       AudioService.playShotSfx('SMASH');
     } else {
       switch (shotType) {
         case 'SMASH':
-          targetY = -0.80;
           airTime = 1.00;
           playerAnimState = CharacterAnimState.smash;
-          timingFeedback = 'STREET SLAM!';
-          break;
-        case 'SPEED_UP':
-          targetY = -0.65;
-          airTime = 1.15;
-          playerAnimState = CharacterAnimState.drive;
-          timingFeedback = 'TURBO SPEED!';
+          timingFeedback = 'POWER SLAM!';
           break;
         case 'ROLL':
         case 'SLICE':
-          targetY = -0.28;
           airTime = 1.45;
           playerAnimState = CharacterAnimState.slice;
-          timingFeedback = 'ALLEY DINK!';
+          timingFeedback = 'SPIN DROP!';
           break;
         case 'LOB':
-          targetY = -0.85;
-          airTime = 1.50;
+          airTime = 1.55;
           playerAnimState = CharacterAnimState.lob;
-          timingFeedback = 'SKY LOB!';
+          timingFeedback = 'HIGH LOB!';
           break;
         case 'DRIVE':
         default:
-          targetY = -0.75;
-          airTime = 1.30;
+          airTime = 1.25;
           playerAnimState = CharacterAnimState.drive;
-          timingFeedback = 'CLEAN DRIVE!';
+          timingFeedback = 'TARGET DRIVE!';
           break;
       }
       AudioService.playShotSfx(shotType);
@@ -278,8 +298,10 @@ class PickleballGame extends FlameGame {
     ballVx = (targetX - ballX) / airTime;
     ballVy = (targetY - ballY) / airTime;
     ballVz = 0.5 * gravity * airTime;
-
     matchStatus = 'RALLY IN PROGRESS';
+    
+    _aiReactionTimer = (0.45 - (aiDupr * 0.05)).clamp(0.1, 0.4);
+    
     _clearTimingFeedback();
   }
 
@@ -300,13 +322,12 @@ class PickleballGame extends FlameGame {
 
     if (_aiShrinkTimer > 0) _aiShrinkTimer -= dt;
 
-    // Player Movement & Animation Cycle
-    double moveSpeed = 1.4 * characterStyle.speedMultiplier;
-    if (playerInputDir != Offset.zero) {
-      playerX =
-          (playerX + playerInputDir.dx * moveSpeed * dt).clamp(-0.92, 0.92);
-      playerY =
-          (playerY + playerInputDir.dy * moveSpeed * dt).clamp(0.20, 0.92);
+    if (_playerLockoutTimer > 0) {
+      _playerLockoutTimer -= dt;
+    } else if (playerInputDir != Offset.zero) {
+      double moveSpeed = 1.4 * characterStyle.speedMultiplier;
+      playerX = (playerX + playerInputDir.dx * moveSpeed * dt).clamp(-0.92, 0.92);
+      playerY = (playerY + playerInputDir.dy * moveSpeed * dt).clamp(0.20, 0.92);
 
       if (playerAnimTimer <= 0) {
         if (playerInputDir.dy < -0.3) {
@@ -333,7 +354,6 @@ class PickleballGame extends FlameGame {
     if (playerAnimTimer > 0) playerAnimTimer -= dt;
     if (aiAnimTimer > 0) aiAnimTimer -= dt;
 
-    // Power Orb Spawning
     if (phase == RallyPhase.activeRally && orbX == null) {
       _orbSpawnTimer += dt;
       if (_orbSpawnTimer > 4.0) {
@@ -344,7 +364,6 @@ class PickleballGame extends FlameGame {
       }
     }
 
-    // AI Serve Trigger
     if (phase == RallyPhase.readyToServe && !isPlayerServing) {
       _aiServeTimer += dt;
       if (_aiServeTimer > 1.0) {
@@ -353,7 +372,6 @@ class PickleballGame extends FlameGame {
       }
     }
 
-    // Ball Dynamics
     if (phase != RallyPhase.readyToServe) {
       ballX += ballVx * dt;
       ballY += ballVy * dt;
@@ -420,15 +438,15 @@ class PickleballGame extends FlameGame {
       case OrbType.speedDemon:
         ballVx *= 1.35;
         ballVy *= 1.35;
-        timingFeedback = '⚡ SPEED DEMON ORB!';
+        timingFeedback = 'SPEED DEMON ORB!';
         break;
       case OrbType.shrinkRay:
         _aiShrinkTimer = 5.0;
-        timingFeedback = '🌀 AI PADDLE SHRUNK!';
+        timingFeedback = 'AI PADDLE SHRUNK!';
         break;
       case OrbType.doublePoints:
         isDoublePointsActive = true;
-        timingFeedback = '💰 DOUBLE POINTS RALLY!';
+        timingFeedback = 'DOUBLE POINTS RALLY!';
         break;
     }
     _clearTimingFeedback();
@@ -437,13 +455,12 @@ class PickleballGame extends FlameGame {
   void _executeAiServe() {
     phase = RallyPhase.inFlight;
     _bounceCount = 0;
-
     ballX = opponentX;
     ballY = opponentY;
     ballHeight = 0.45;
 
-    double targetX = playerX * 0.4 + (Random().nextDouble() - 0.5) * 0.3;
-    double targetY = 0.65;
+    double targetX = (Random().nextDouble() - 0.5) * 1.5;
+    double targetY = 0.65 + Random().nextDouble() * 0.15;
     double airTime = 1.35;
 
     ballVx = (targetX - opponentX) / airTime;
@@ -452,7 +469,6 @@ class PickleballGame extends FlameGame {
 
     aiAnimState = CharacterAnimState.serving;
     aiAnimTimer = 0.35;
-
     matchStatus = 'AI SERVED - RETURN IT!';
     AudioService.playShotSfx('DRIVE');
   }
@@ -462,36 +478,41 @@ class PickleballGame extends FlameGame {
     double oldX = opponentX;
     double oldY = opponentY;
 
-    // Dynamic 2-Axis Tracking (X & Y Axis Movement)
-    if (ballX > opponentX + 0.04) {
-      opponentX = (opponentX + aiSpeed * dt).clamp(-0.92, 0.92);
-    } else if (ballX < opponentX - 0.04) {
-      opponentX = (opponentX - aiSpeed * dt).clamp(-0.92, 0.92);
-    }
-
-    // Dynamic Depth Logic: Advance for dinks/short balls, retreat for lobs
-    double targetY = -0.75;
-    if (ballVy < 0) {
-      if (ballVz > 0.8 || ballHeight > 0.65) {
-        targetY = -0.88; // Retreat to baseline
-      } else if (ballY > -0.35) {
-        targetY = -0.35; // Advance to kitchen line
+    if (_aiReactionTimer > 0) {
+      _aiReactionTimer -= dt;
+    } else {
+      if (ballVy > 0) {
+        _aiTargetX = 0.0;
+        _aiTargetY = (opponentY > -0.45) ? -0.35 : -0.85;
       } else {
-        targetY = -0.65;
+        double variance = max(0, (5.0 - aiDupr)) * 0.08;
+        _aiTargetX = ballX + (Random().nextDouble() - 0.5) * variance;
+
+        if (ballHeight > 0.60 || ballVz > 0.8) {
+          _aiTargetY = -0.85;
+        } else if (ballY > -0.35) {
+          _aiTargetY = -0.35;
+        } else {
+          _aiTargetY = -0.65;
+        }
       }
     }
 
-    if (opponentY < targetY - 0.03) {
+    if (opponentX < _aiTargetX - 0.04) {
+      opponentX = (opponentX + aiSpeed * dt).clamp(-0.92, 0.92);
+    } else if (opponentX > _aiTargetX + 0.04) {
+      opponentX = (opponentX - aiSpeed * dt).clamp(-0.92, 0.92);
+    }
+
+    if (opponentY < _aiTargetY - 0.03) {
       opponentY = (opponentY + aiSpeed * 0.85 * dt).clamp(-0.92, -0.30);
-    } else if (opponentY > targetY + 0.03) {
+    } else if (opponentY > _aiTargetY + 0.03) {
       opponentY = (opponentY - aiSpeed * 0.85 * dt).clamp(-0.92, -0.30);
     }
 
-    // AI Directional Animation Cycling
     if (aiAnimTimer <= 0) {
       double dx = opponentX - oldX;
       double dy = opponentY - oldY;
-
       if (dx.abs() > 0.001 || dy.abs() > 0.001) {
         if (dy < -0.001) {
           aiAnimState = CharacterAnimState.walkingUp;
@@ -502,7 +523,6 @@ class PickleballGame extends FlameGame {
         } else {
           aiAnimState = CharacterAnimState.walkingRight;
         }
-
         aiStepTimer += dt;
         if (aiStepTimer > 0.12) {
           aiFrame = (aiFrame + 1) % 4;
@@ -514,13 +534,12 @@ class PickleballGame extends FlameGame {
       }
     }
 
-    // AI Hit & Kitchen Fault Detection
+    // Scaled down AI reach to match the newly tightened player challenge mechanics
     if (ballVy < 0 && ballY <= opponentY + 0.20 && ballY >= opponentY - 0.20) {
-      double reach = 0.60 + (aiDupr / 5.0) * 0.15;
+      double reach = 0.40 + (aiDupr / 5.0) * 0.10;
       if (_aiShrinkTimer > 0) reach *= 0.50;
 
       if ((ballX - opponentX).abs() <= reach) {
-        // AI Non-Volley Zone (Kitchen) Fault Enforcement
         if (opponentY > -0.32 && ballHeight > 0.15) {
           matchStatus = 'AI KITCHEN FAULT! YOUR POINT';
           AudioService.playFaultSfx();
@@ -532,25 +551,37 @@ class PickleballGame extends FlameGame {
         phase = RallyPhase.activeRally;
         isUltimateActive = false;
 
-        double targetX = playerX * 0.5 + (Random().nextDouble() - 0.5) * 0.4;
-        double targetY = 0.72;
-        double airTime = 1.30;
+        // Inject randomness into AI Targeting
+        double targetX = (Random().nextDouble() - 0.5) * 1.70; // Aim randomly across the horizontal plane
+        double targetY;
+        double airTime;
+        int shotChoice = Random().nextInt(100);
 
         if (opponentY > -0.45) {
           aiAnimState = CharacterAnimState.slice;
+          targetY = 0.35 + Random().nextDouble() * 0.15; // Unpredictable short drop
+          airTime = 1.45;
         } else if (ballHeight > 0.5) {
           aiAnimState = CharacterAnimState.smash;
-          targetY = 0.82;
+          targetY = 0.75 + Random().nextDouble() * 0.15; // Deep unpredictable smash
           airTime = 0.95;
         } else {
-          aiAnimState = CharacterAnimState.drive;
+          // 25% chance the AI attempts a Lob instead of a standard Drive
+          if (shotChoice < 25) {
+            aiAnimState = CharacterAnimState.lob;
+            targetY = 0.80 + Random().nextDouble() * 0.10;
+            airTime = 1.60;
+          } else {
+            aiAnimState = CharacterAnimState.drive;
+            targetY = 0.60 + Random().nextDouble() * 0.30; // Random depth variation
+            airTime = 1.25;
+          }
         }
-        aiAnimTimer = 0.35;
 
+        aiAnimTimer = 0.35;
         ballVx = (targetX - ballX) / airTime;
         ballVy = (targetY - ballY) / airTime;
         ballVz = 0.5 * gravity * airTime;
-
         matchStatus = 'RALLY IN PROGRESS';
         AudioService.playShotSfx('DRIVE');
       } else if (ballY < -1.08) {
@@ -565,7 +596,6 @@ class PickleballGame extends FlameGame {
     int pointsEarned = isDoublePointsActive ? 2 : 1;
     playerScore += pointsEarned;
     isDoublePointsActive = false;
-
     if (playerScore >= targetScore && (playerScore - opponentScore) >= 2) {
       isGameOver = true;
       matchStatus = 'MATCH OVER! YOU WIN!';
@@ -579,7 +609,6 @@ class PickleballGame extends FlameGame {
     int pointsEarned = isDoublePointsActive ? 2 : 1;
     opponentScore += pointsEarned;
     isDoublePointsActive = false;
-
     if (opponentScore >= targetScore && (opponentScore - playerScore) >= 2) {
       isGameOver = true;
       matchStatus = 'MATCH OVER! AI WINS!';
@@ -615,6 +644,9 @@ class PickleballGame extends FlameGame {
       aiAnimState: aiAnimState,
       playerFrame: playerFrame,
       aiFrame: aiFrame,
+      aimTargetX: aimTargetX,
+      aimTargetY: aimTargetY,
+      isAiming: isAiming,
     );
   }
 }
