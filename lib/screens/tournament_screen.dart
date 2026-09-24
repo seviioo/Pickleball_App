@@ -1,341 +1,493 @@
 import 'package:flutter/material.dart';
-import '../models/game_models.dart';
-import '../theme/app_theme.dart';
-import 'court_gameplay_screen.dart';
+
+class TournamentRival {
+  final String name;
+  final String nickname;
+  final String title;
+  final double dupr;
+  final Color themeColor;
+  final IconData avatarIcon;
+
+  const TournamentRival({
+    required this.name,
+    required this.nickname,
+    required this.title,
+    required this.dupr,
+    required this.themeColor,
+    required this.avatarIcon,
+  });
+}
+
+const List<TournamentRival> kTournamentRivals = [
+  TournamentRival(
+    name: 'Rook Vance',
+    nickname: 'Dink Master',
+    title: 'Quarterfinal Boss',
+    dupr: 2.5,
+    themeColor: Colors.cyanAccent,
+    avatarIcon: Icons.sports_tennis,
+  ),
+  TournamentRival(
+    name: 'Maya Lin',
+    nickname: 'Kitchen Queen',
+    title: 'Semifinal Boss',
+    dupr: 4.0,
+    themeColor: Colors.purpleAccent,
+    avatarIcon: Icons.bolt,
+  ),
+  TournamentRival(
+    name: 'Jax Steele',
+    nickname: 'Spin Boss',
+    title: 'Finals Legend',
+    dupr: 5.5,
+    themeColor: Colors.orangeAccent,
+    avatarIcon: Icons.local_fire_department,
+  ),
+];
 
 class TournamentScreen extends StatefulWidget {
-  final String userName;
-  final PaddleData paddle;
-  final CharacterStyleData characterStyle;
+  final String? userName;
+  final dynamic paddle;
+  final dynamic characterStyle;
+  final int currentRound; // 0: QF, 1: SF, 2: Finals, 3: Completed
 
   const TournamentScreen({
-    super.key,
-    required this.userName,
-    required this.paddle,
-    required this.characterStyle,
-  });
+    Key? key,
+    this.userName,
+    this.paddle,
+    this.characterStyle,
+    this.currentRound = 0,
+  }) : super(key: key);
 
   @override
   State<TournamentScreen> createState() => _TournamentScreenState();
 }
 
-class _TournamentScreenState extends State<TournamentScreen> {
-  int currentRound = 1;
+class _TournamentScreenState extends State<TournamentScreen>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _pulseController;
 
-  final List<Map<String, dynamic>> tournamentRounds = [
-    {
-      'round': 1,
-      'title': 'QUARTERFINALS',
-      'opponent': 'Rook "The Wall" Vance',
-      'dupr': 2.8,
-      'reward': 150,
-    },
-    {
-      'round': 2,
-      'title': 'SEMIFINALS',
-      'opponent': 'Maya "Alley Queen" Lin',
-      'dupr': 3.8,
-      'reward': 350,
-    },
-    {
-      'round': 3,
-      'title': 'STREET FINALS',
-      'opponent': 'Jax "Spin Boss" Steele',
-      'dupr': 4.8,
-      'reward': 1000,
-    },
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1400),
+    )..repeat(reverse: true);
+  }
 
-  void _startRoundMatch(Map<String, dynamic> roundData) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => CourtGameplayScreen(
-          userName: widget.userName,
-          paddle: widget.paddle,
-          characterStyle: widget.characterStyle,
-          targetScore: 11,
-          aiDupr: roundData['dupr'],
-        ),
-      ),
-    );
+  @override
+  void dispose() {
+    _pulseController.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.void_,
-      extendBodyBehindAppBar: true,
-      appBar: streetAppBar('UNDERGROUND BRACKET'),
-      body: StreetBackground(
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Championship banner
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        AppColors.gold.withOpacity(0.16),
-                        AppColors.surface,
-                      ],
-                    ),
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(
-                        color: AppColors.gold.withOpacity(0.5), width: 1.4),
-                  ),
-                  child: Row(
+      backgroundColor: const Color(0xFF0F1115),
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        title: const Text(
+          'UNDERGROUND BRACKET',
+          style: TextStyle(
+            fontWeight: FontWeight.w900,
+            letterSpacing: 1.5,
+            color: Colors.white,
+          ),
+        ),
+        centerTitle: true,
+      ),
+      body: AnimatedBuilder(
+        animation: _pulseController,
+        builder: (context, _) {
+          final pulseValue = _pulseController.value;
+          return Column(
+            children: [
+              // 1. Prize Pool Spotlight
+              _buildPrizePoolSpotlight(pulseValue),
+              const SizedBox(height: 16),
+
+              // 2. Tournament Bracket View with Animated Rails
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                  child: Stack(
                     children: [
-                      Container(
-                        width: 50,
-                        height: 50,
-                        decoration: BoxDecoration(
-                          gradient: AppColors.goldButton,
-                          borderRadius: BorderRadius.circular(14),
-                          boxShadow: [
-                            BoxShadow(
-                                color: AppColors.gold.withOpacity(0.4),
-                                blurRadius: 14),
-                          ],
+                      // Animated Bracket Rails
+                      Positioned.fill(
+                        child: CustomPaint(
+                          painter: BracketRailsPainter(
+                            currentRound: widget.currentRound,
+                            pulseProgress: pulseValue,
+                          ),
                         ),
-                        child: const Icon(Icons.emoji_events_rounded,
-                            color: Colors.black, size: 28),
                       ),
-                      const SizedBox(width: 14),
-                      const Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('STREET CHAMPIONSHIP',
-                                style: TextStyle(
-                                    color: AppColors.textPrimary,
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w900,
-                                    letterSpacing: 0.3)),
-                            SizedBox(height: 2),
-                            Text(
-                                'Win 3 consecutive matches to claim the Street Cash Prize.',
-                                style: TextStyle(
-                                    color: AppColors.textSecondary,
-                                    fontSize: 11.5,
-                                    height: 1.3)),
-                          ],
-                        ),
+                      // Rival Cards Column
+                      Column(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children:
+                            List.generate(kTournamentRivals.length, (index) {
+                          return _buildRivalCard(
+                            rival: kTournamentRivals[index],
+                            roundIndex: index,
+                            pulseValue: pulseValue,
+                          );
+                        }),
                       ),
                     ],
                   ),
                 ),
+              ),
 
-                const SizedBox(height: 24),
+              // 3. Action Footer Button
+              _buildStartMatchButton(),
+            ],
+          );
+        },
+      ),
+    );
+  }
 
-                Expanded(
-                  child: ListView.builder(
-                    itemCount: tournamentRounds.length,
-                    itemBuilder: (context, index) {
-                      final item = tournamentRounds[index];
-                      final bool isCurrent = item['round'] == currentRound;
-                      final bool isLocked = item['round'] > currentRound;
-                      final bool isDone = item['round'] < currentRound;
-                      final bool isLast = index == tournamentRounds.length - 1;
-
-                      return IntrinsicHeight(
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            // Bracket connector rail
-                            SizedBox(
-                              width: 34,
-                              child: Column(
-                                children: [
-                                  Container(
-                                    width: 34,
-                                    height: 34,
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      color: isDone
-                                          ? AppColors.gold
-                                          : (isCurrent
-                                              ? AppColors.redBright
-                                              : AppColors.surfaceRaised),
-                                      border: Border.all(
-                                        color: isLocked
-                                            ? AppColors.hairline
-                                            : Colors.transparent,
-                                        width: 1.4,
-                                      ),
-                                      boxShadow: isCurrent
-                                          ? [
-                                              BoxShadow(
-                                                  color: AppColors.red
-                                                      .withOpacity(0.45),
-                                                  blurRadius: 10),
-                                            ]
-                                          : null,
-                                    ),
-                                    child: Icon(
-                                      isDone
-                                          ? Icons.check_rounded
-                                          : (isLocked
-                                              ? Icons.lock_rounded
-                                              : Icons.play_arrow_rounded),
-                                      color: isLocked
-                                          ? AppColors.textFaint
-                                          : (isDone
-                                              ? Colors.black
-                                              : Colors.white),
-                                      size: 18,
-                                    ),
-                                  ),
-                                  if (!isLast)
-                                    Expanded(
-                                      child: Container(
-                                        width: 2.5,
-                                        margin: const EdgeInsets.symmetric(
-                                            vertical: 4),
-                                        color: isDone
-                                            ? AppColors.gold.withOpacity(0.6)
-                                            : AppColors.hairline,
-                                      ),
-                                    ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            // Round card
-                            Expanded(
-                              child: Padding(
-                                padding: const EdgeInsets.only(bottom: 14),
-                                child: Opacity(
-                                  opacity: isLocked ? 0.55 : 1.0,
-                                  child: StreetCard(
-                                    borderColor: isCurrent
-                                        ? AppColors.redBright
-                                        : AppColors.hairline,
-                                    borderWidth: isCurrent ? 1.6 : 1.2,
-                                    shadows: isCurrent
-                                        ? [
-                                            BoxShadow(
-                                                color: AppColors.red
-                                                    .withOpacity(0.18),
-                                                blurRadius: 16,
-                                                offset: const Offset(0, 6)),
-                                          ]
-                                        : null,
-                                    onTap: isCurrent
-                                        ? () => _startRoundMatch(item)
-                                        : null,
-                                    child: Row(
-                                      children: [
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              Kicker(
-                                                item['title'],
-                                                color: isCurrent
-                                                    ? AppColors.redBright
-                                                    : AppColors.textFaint,
-                                              ),
-                                              const SizedBox(height: 3),
-                                              Text(
-                                                item['opponent'],
-                                                style: const TextStyle(
-                                                    color:
-                                                        AppColors.textPrimary,
-                                                    fontSize: 15.5,
-                                                    fontWeight:
-                                                        FontWeight.w900),
-                                              ),
-                                              const SizedBox(height: 4),
-                                              Row(
-                                                children: [
-                                                  Container(
-                                                    padding: const EdgeInsets
-                                                        .symmetric(
-                                                        horizontal: 6,
-                                                        vertical: 2),
-                                                    decoration: BoxDecoration(
-                                                      color: AppColors
-                                                          .surfaceRaised,
-                                                      borderRadius:
-                                                          BorderRadius.circular(
-                                                              6),
-                                                    ),
-                                                    child: Text(
-                                                      'DUPR ${item['dupr']}',
-                                                      style: const TextStyle(
-                                                          color: AppColors
-                                                              .textSecondary,
-                                                          fontSize: 10,
-                                                          fontWeight:
-                                                              FontWeight.w800),
-                                                    ),
-                                                  ),
-                                                  const SizedBox(width: 8),
-                                                  const Icon(
-                                                      Icons
-                                                          .monetization_on_rounded,
-                                                      size: 13,
-                                                      color: AppColors.gold),
-                                                  const SizedBox(width: 3),
-                                                  Text(
-                                                    '+${item['reward']}',
-                                                    style: const TextStyle(
-                                                        color: AppColors.gold,
-                                                        fontSize: 11,
-                                                        fontWeight:
-                                                            FontWeight.w800),
-                                                  ),
-                                                ],
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                        if (isCurrent)
-                                          Container(
-                                            padding: const EdgeInsets.all(9),
-                                            decoration: BoxDecoration(
-                                              gradient: AppColors.redButton,
-                                              shape: BoxShape.circle,
-                                            ),
-                                            child: const Icon(
-                                                Icons.play_arrow_rounded,
-                                                color: Colors.white,
-                                                size: 18),
-                                          ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
+  Widget _buildPrizePoolSpotlight(double pulseValue) {
+    final glowOpacity = 0.3 + (pulseValue * 0.4);
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF2A1A08), Color(0xFF140F07), Color(0xFF2A1A08)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Colors.amberAccent.withOpacity(0.6 + (pulseValue * 0.4)),
+          width: 2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.amber.withOpacity(glowOpacity),
+            blurRadius: 16,
+            spreadRadius: 2,
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.amber.withOpacity(0.15),
+              border: Border.all(color: Colors.amberAccent, width: 2),
+            ),
+            child: const Icon(
+              Icons.emoji_events,
+              color: Colors.amberAccent,
+              size: 36,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: const [
+                    Text(
+                      'GRAND PRIZE PURSE',
+                      style: TextStyle(
+                        color: Colors.amberAccent,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                        letterSpacing: 1.2,
+                      ),
+                    ),
+                    Spacer(),
+                    Icon(Icons.workspace_premium,
+                        color: Colors.amber, size: 16),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  '1,500 COINS + RARE STREET PADDLE',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 15,
                   ),
                 ),
-
-                PrimaryCTA(
-                  label: 'ENTER BRACKET MATCH',
-                  icon: Icons.sports_kabaddi_rounded,
-                  gradient: AppColors.redButton,
-                  glowColor: AppColors.red,
-                  foreground: Colors.white,
-                  onPressed: () =>
-                      _startRoundMatch(tournamentRounds[currentRound - 1]),
+                const SizedBox(height: 2),
+                Text(
+                  '+500 Street Rep XP upon bracket clearance',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.6),
+                    fontSize: 11,
+                  ),
                 ),
               ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRivalCard({
+    required TournamentRival rival,
+    required int roundIndex,
+    required double pulseValue,
+  }) {
+    final bool isDefeated = widget.currentRound > roundIndex;
+    final bool isCurrent = widget.currentRound == roundIndex;
+    final bool isLocked = widget.currentRound < roundIndex;
+
+    Color cardBorder = isCurrent
+        ? rival.themeColor
+        : (isDefeated ? Colors.greenAccent.withOpacity(0.5) : Colors.white10);
+
+    return Container(
+      height: 90,
+      margin: const EdgeInsets.symmetric(vertical: 6),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isLocked ? const Color(0xFF16181D) : const Color(0xFF1F232C),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isCurrent
+              ? rival.themeColor.withOpacity(0.7 + (pulseValue * 0.3))
+              : cardBorder,
+          width: isCurrent ? 2.5 : 1.0,
+        ),
+        boxShadow: isCurrent
+            ? [
+                BoxShadow(
+                  color: rival.themeColor.withOpacity(0.3 * pulseValue),
+                  blurRadius: 12,
+                  spreadRadius: 1,
+                )
+              ]
+            : null,
+      ),
+      child: Row(
+        children: [
+          // Avatar Badge
+          Stack(
+            alignment: Alignment.center,
+            children: [
+              CircleAvatar(
+                radius: 28,
+                backgroundColor: isLocked
+                    ? Colors.grey.shade900
+                    : rival.themeColor.withOpacity(0.2),
+                child: Icon(
+                  isLocked ? Icons.lock : rival.avatarIcon,
+                  color: isLocked ? Colors.grey : rival.themeColor,
+                  size: 28,
+                ),
+              ),
+              if (isDefeated)
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.black.withOpacity(0.6),
+                  ),
+                  child: const Icon(
+                    Icons.check_circle,
+                    color: Colors.greenAccent,
+                    size: 32,
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(width: 14),
+
+          // Rival Details
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      '${rival.name} "${rival.nickname}"',
+                      style: TextStyle(
+                        color: isLocked ? Colors.grey : Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  rival.title,
+                  style: TextStyle(
+                    color: isLocked ? Colors.white24 : rival.themeColor,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // DUPR Tag / Status
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: isCurrent
+                  ? rival.themeColor.withOpacity(0.2)
+                  : Colors.black26,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: isCurrent ? rival.themeColor : Colors.white10,
+              ),
+            ),
+            child: Text(
+              'DUPR ${rival.dupr.toStringAsFixed(1)}',
+              style: TextStyle(
+                color: isCurrent ? rival.themeColor : Colors.grey,
+                fontWeight: FontWeight.bold,
+                fontSize: 11,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStartMatchButton() {
+    final bool bracketFinished =
+        widget.currentRound >= kTournamentRivals.length;
+    final currentRival =
+        bracketFinished ? null : kTournamentRivals[widget.currentRound];
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      color: const Color(0xFF14161C),
+      child: SafeArea(
+        top: false,
+        child: SizedBox(
+          width: double.infinity,
+          height: 54,
+          child: ElevatedButton(
+            onPressed: bracketFinished
+                ? () => Navigator.pop(context)
+                : () {
+                    // Navigate to gameplay match against current rival
+                  },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: bracketFinished
+                  ? Colors.amber
+                  : (currentRival?.themeColor ?? Colors.amberAccent),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              elevation: 4,
+            ),
+            child: Text(
+              bracketFinished
+                  ? 'CLAIM CHAMPION TROPHY'
+                  : 'ENTER ${currentRival?.title.toUpperCase()}',
+              style: const TextStyle(
+                color: Colors.black,
+                fontWeight: FontWeight.w900,
+                fontSize: 15,
+                letterSpacing: 1.1,
+              ),
             ),
           ),
         ),
       ),
     );
+  }
+}
+
+/// Dynamic Bracket Line Connectors Painter
+class BracketRailsPainter extends CustomPainter {
+  final int currentRound;
+  final double pulseProgress;
+
+  BracketRailsPainter({
+    required this.currentRound,
+    required this.pulseProgress,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final double cardHeight = 90.0;
+    final double verticalGap = (size.height - (cardHeight * 3)) / 2;
+
+    final double startX = 40.0; // Align with center of avatar circle
+    final double y1 = cardHeight / 2;
+    final double y2 = y1 + cardHeight + verticalGap;
+    final double y3 = y2 + cardHeight + verticalGap;
+
+    // Line segment 1: Round 0 -> Round 1
+    _drawRailSegment(
+      canvas: canvas,
+      start: Offset(startX, y1 + 24),
+      end: Offset(startX, y2 - 24),
+      isActive: currentRound >= 1,
+      isPulsing: currentRound == 0,
+    );
+
+    // Line segment 2: Round 1 -> Round 2
+    _drawRailSegment(
+      canvas: canvas,
+      start: Offset(startX, y2 + 24),
+      end: Offset(startX, y3 - 24),
+      isActive: currentRound >= 2,
+      isPulsing: currentRound == 1,
+    );
+  }
+
+  void _drawRailSegment({
+    required Canvas canvas,
+    required Offset start,
+    required Offset end,
+    required bool isActive,
+    required bool isPulsing,
+  }) {
+    final basePaint = Paint()
+      ..strokeWidth = 3.0
+      ..strokeCap = StrokeCap.round;
+
+    if (isActive) {
+      basePaint.color = Colors.greenAccent;
+      canvas.drawLine(start, end, basePaint);
+    } else if (isPulsing) {
+      basePaint.color = Color.lerp(
+        Colors.amberAccent.withOpacity(0.3),
+        Colors.amberAccent,
+        pulseProgress,
+      )!;
+      basePaint.strokeWidth = 4.0;
+
+      // Outer Glow Line
+      final glowPaint = Paint()
+        ..color = Colors.amberAccent.withOpacity(0.4 * pulseProgress)
+        ..strokeWidth = 8.0
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4.0);
+
+      canvas.drawLine(start, end, glowPaint);
+      canvas.drawLine(start, end, basePaint);
+    } else {
+      basePaint.color = Colors.white10;
+      canvas.drawLine(start, end, basePaint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant BracketRailsPainter oldDelegate) {
+    return oldDelegate.currentRound != currentRound ||
+        oldDelegate.pulseProgress != pulseProgress;
   }
 }
