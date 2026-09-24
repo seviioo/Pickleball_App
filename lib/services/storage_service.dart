@@ -84,7 +84,7 @@ class StorageService {
     final prefs = await SharedPreferences.getInstance();
     final lastClaim = prefs.getInt(_keyLastDailyClaim) ?? 0;
     final now = DateTime.now().millisecondsSinceEpoch;
-    return (now - lastClaim) >= 86400000; // 24 hours
+    return (now - lastClaim) >= 86400000;
   }
 
   static Future<void> claimDailyStash() async {
@@ -125,6 +125,14 @@ class StorageService {
         control: 80,
         spin: 90,
         price: 600,
+      ),
+      PaddleData(
+        id: 'titanium_dragon',
+        name: 'Apex Titanium Dragon',
+        power: 98,
+        control: 92,
+        spin: 96,
+        price: 1200,
       ),
     ];
 

@@ -1,5 +1,35 @@
 import 'package:flutter/material.dart';
 
+enum PaddleRarity { common, rare, epic, legendary }
+
+extension PaddleRarityX on PaddleRarity {
+  String get label {
+    switch (this) {
+      case PaddleRarity.common:
+        return 'COMMON';
+      case PaddleRarity.rare:
+        return 'RARE';
+      case PaddleRarity.epic:
+        return 'EPIC';
+      case PaddleRarity.legendary:
+        return 'LEGENDARY';
+    }
+  }
+
+  Color get color {
+    switch (this) {
+      case PaddleRarity.common:
+        return const Color(0xFFA1A1AA);
+      case PaddleRarity.rare:
+        return const Color(0xFF38BDF8);
+      case PaddleRarity.epic:
+        return const Color(0xFFA855F7);
+      case PaddleRarity.legendary:
+        return const Color(0xFFFACC15);
+    }
+  }
+}
+
 class PaddleData {
   final String id;
   final String name;
@@ -19,7 +49,14 @@ class PaddleData {
     this.isUnlocked = false,
   });
 
-  Color get accentColor => const Color(0xFFFACC15);
+  PaddleRarity get rarity {
+    if (price >= 1000) return PaddleRarity.legendary;
+    if (price >= 500) return PaddleRarity.epic;
+    if (price >= 200) return PaddleRarity.rare;
+    return PaddleRarity.common;
+  }
+
+  Color get accentColor => rarity.color;
 
   factory PaddleData.starter() {
     return PaddleData(
