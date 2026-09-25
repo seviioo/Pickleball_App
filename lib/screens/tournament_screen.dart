@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import '../models/game_models.dart';
+import '../services/storage_service.dart';
+import 'court_gameplay_screen.dart';
 
 class TournamentRival {
   final String name;
@@ -46,18 +49,8 @@ const List<TournamentRival> kTournamentRivals = [
 ];
 
 class TournamentScreen extends StatefulWidget {
-  final String? userName;
-  final dynamic paddle;
-  final dynamic characterStyle;
   final int currentRound; // 0: QF, 1: SF, 2: Finals, 3: Completed
-
-  const TournamentScreen({
-    Key? key,
-    this.userName,
-    this.paddle,
-    this.characterStyle,
-    this.currentRound = 0,
-  }) : super(key: key);
+  const TournamentScreen({Key? key, this.currentRound = 0}) : super(key: key);
 
   @override
   State<TournamentScreen> createState() => _TournamentScreenState();
@@ -108,7 +101,6 @@ class _TournamentScreenState extends State<TournamentScreen>
               // 1. Prize Pool Spotlight
               _buildPrizePoolSpotlight(pulseValue),
               const SizedBox(height: 16),
-
               // 2. Tournament Bracket View with Animated Rails
               Expanded(
                 child: Padding(
@@ -140,7 +132,6 @@ class _TournamentScreenState extends State<TournamentScreen>
                   ),
                 ),
               ),
-
               // 3. Action Footer Button
               _buildStartMatchButton(),
             ],
@@ -243,11 +234,9 @@ class _TournamentScreenState extends State<TournamentScreen>
     final bool isDefeated = widget.currentRound > roundIndex;
     final bool isCurrent = widget.currentRound == roundIndex;
     final bool isLocked = widget.currentRound < roundIndex;
-
     Color cardBorder = isCurrent
         ? rival.themeColor
         : (isDefeated ? Colors.greenAccent.withOpacity(0.5) : Colors.white10);
-
     return Container(
       height: 90,
       margin: const EdgeInsets.symmetric(vertical: 6),
@@ -305,7 +294,6 @@ class _TournamentScreenState extends State<TournamentScreen>
             ],
           ),
           const SizedBox(width: 14),
-
           // Rival Details
           Expanded(
             child: Column(
@@ -336,7 +324,6 @@ class _TournamentScreenState extends State<TournamentScreen>
               ],
             ),
           ),
-
           // DUPR Tag / Status
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -380,8 +367,22 @@ class _TournamentScreenState extends State<TournamentScreen>
           child: ElevatedButton(
             onPressed: bracketFinished
                 ? () => Navigator.pop(context)
-                : () {
-                    // Navigate to gameplay match against current rival
+                : () async {
+                    final equippedPaddle =
+                        await StorageService.getEquippedPaddle();
+                    if (!context.mounted) return;
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => CourtGameplayScreen(
+                          userName: 'Player',
+                          paddle: equippedPaddle,
+                          characterStyle: kCharacterStyles[0],
+                          targetScore: 11,
+                          aiDupr: currentRival!.dupr,
+                        ),
+                      ),
+                    );
                   },
             style: ElevatedButton.styleFrom(
               backgroundColor: bracketFinished
@@ -424,7 +425,6 @@ class BracketRailsPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final double cardHeight = 90.0;
     final double verticalGap = (size.height - (cardHeight * 3)) / 2;
-
     final double startX = 40.0; // Align with center of avatar circle
     final double y1 = cardHeight / 2;
     final double y2 = y1 + cardHeight + verticalGap;
