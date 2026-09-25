@@ -376,3 +376,21 @@ PreferredSizeWidget streetAppBar(String title, {List<Widget>? actions}) {
     actions: actions,
   );
 }
+
+class AppTheme {
+  static ThemeData get darkTheme {
+    return ThemeData.dark().copyWith(
+      scaffoldBackgroundColor: AppColors.ink,
+      primaryColor: AppColors.gold,
+      colorScheme: const ColorScheme.dark(
+        primary: AppColors.gold,
+        secondary: AppColors.red,
+        surface: AppColors.surface,
+      ),
+      appBarTheme: const AppBarTheme(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+      ),
+    );
+  }
+}

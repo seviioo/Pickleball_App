@@ -49,8 +49,7 @@ const List<TournamentRival> kTournamentRivals = [
 ];
 
 class TournamentScreen extends StatefulWidget {
-  final int currentRound; // 0: QF, 1: SF, 2: Finals, 3: Completed
-  const TournamentScreen({Key? key, this.currentRound = 0}) : super(key: key);
+  const TournamentScreen({Key? key}) : super(key: key);
 
   @override
   State<TournamentScreen> createState() => _TournamentScreenState();
@@ -59,6 +58,7 @@ class TournamentScreen extends StatefulWidget {
 class _TournamentScreenState extends State<TournamentScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _pulseController;
+  int _currentRound = 0;
 
   @override
   void initState() {
@@ -67,6 +67,14 @@ class _TournamentScreenState extends State<TournamentScreen>
       vsync: this,
       duration: const Duration(milliseconds: 1400),
     )..repeat(reverse: true);
+    _loadRoundProgress();
+  }
+
+  Future<void> _loadRoundProgress() async {
+    final round = await StorageService.getTournamentRound();
+    if (mounted) {
+      setState(() => _currentRound = round);
+    }
   }
 
   @override
@@ -98,25 +106,21 @@ class _TournamentScreenState extends State<TournamentScreen>
           final pulseValue = _pulseController.value;
           return Column(
             children: [
-              // 1. Prize Pool Spotlight
               _buildPrizePoolSpotlight(pulseValue),
               const SizedBox(height: 16),
-              // 2. Tournament Bracket View with Animated Rails
               Expanded(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16.0),
                   child: Stack(
                     children: [
-                      // Animated Bracket Rails
                       Positioned.fill(
                         child: CustomPaint(
                           painter: BracketRailsPainter(
-                            currentRound: widget.currentRound,
+                            currentRound: _currentRound,
                             pulseProgress: pulseValue,
                           ),
                         ),
                       ),
-                      // Rival Cards Column
                       Column(
                         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                         children:
@@ -132,7 +136,6 @@ class _TournamentScreenState extends State<TournamentScreen>
                   ),
                 ),
               ),
-              // 3. Action Footer Button
               _buildStartMatchButton(),
             ],
           );
@@ -231,9 +234,9 @@ class _TournamentScreenState extends State<TournamentScreen>
     required int roundIndex,
     required double pulseValue,
   }) {
-    final bool isDefeated = widget.currentRound > roundIndex;
-    final bool isCurrent = widget.currentRound == roundIndex;
-    final bool isLocked = widget.currentRound < roundIndex;
+    final bool isDefeated = _currentRound > roundIndex;
+    final bool isCurrent = _currentRound == roundIndex;
+    final bool isLocked = _currentRound < roundIndex;
     Color cardBorder = isCurrent
         ? rival.themeColor
         : (isDefeated ? Colors.greenAccent.withOpacity(0.5) : Colors.white10);
@@ -262,7 +265,6 @@ class _TournamentScreenState extends State<TournamentScreen>
       ),
       child: Row(
         children: [
-          // Avatar Badge
           Stack(
             alignment: Alignment.center,
             children: [
@@ -294,23 +296,18 @@ class _TournamentScreenState extends State<TournamentScreen>
             ],
           ),
           const SizedBox(width: 14),
-          // Rival Details
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Row(
-                  children: [
-                    Text(
-                      '${rival.name} "${rival.nickname}"',
-                      style: TextStyle(
-                        color: isLocked ? Colors.grey : Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 15,
-                      ),
-                    ),
-                  ],
+                Text(
+                  '${rival.name} "${rival.nickname}"',
+                  style: TextStyle(
+                    color: isLocked ? Colors.grey : Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                  ),
                 ),
                 const SizedBox(height: 3),
                 Text(
@@ -324,7 +321,6 @@ class _TournamentScreenState extends State<TournamentScreen>
               ],
             ),
           ),
-          // DUPR Tag / Status
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
@@ -351,10 +347,9 @@ class _TournamentScreenState extends State<TournamentScreen>
   }
 
   Widget _buildStartMatchButton() {
-    final bool bracketFinished =
-        widget.currentRound >= kTournamentRivals.length;
+    final bool bracketFinished = _currentRound >= kTournamentRivals.length;
     final currentRival =
-        bracketFinished ? null : kTournamentRivals[widget.currentRound];
+        bracketFinished ? null : kTournamentRivals[_currentRound];
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -366,12 +361,15 @@ class _TournamentScreenState extends State<TournamentScreen>
           height: 54,
           child: ElevatedButton(
             onPressed: bracketFinished
-                ? () => Navigator.pop(context)
+                ? () async {
+                    await StorageService.resetTournament();
+                    _loadRoundProgress();
+                  }
                 : () async {
                     final equippedPaddle =
                         await StorageService.getEquippedPaddle();
                     if (!context.mounted) return;
-                    Navigator.push(
+                    await Navigator.push(
                       context,
                       MaterialPageRoute(
                         builder: (context) => CourtGameplayScreen(
@@ -380,9 +378,12 @@ class _TournamentScreenState extends State<TournamentScreen>
                           characterStyle: kCharacterStyles[0],
                           targetScore: 11,
                           aiDupr: currentRival!.dupr,
+                          isTournamentMatch: true,
+                          tournamentRound: _currentRound,
                         ),
                       ),
                     );
+                    _loadRoundProgress();
                   },
             style: ElevatedButton.styleFrom(
               backgroundColor: bracketFinished
@@ -395,7 +396,7 @@ class _TournamentScreenState extends State<TournamentScreen>
             ),
             child: Text(
               bracketFinished
-                  ? 'CLAIM CHAMPION TROPHY'
+                  ? 'RESET BRACKET FOR NEW RUN'
                   : 'ENTER ${currentRival?.title.toUpperCase()}',
               style: const TextStyle(
                 color: Colors.black,
@@ -411,7 +412,6 @@ class _TournamentScreenState extends State<TournamentScreen>
   }
 }
 
-/// Dynamic Bracket Line Connectors Painter
 class BracketRailsPainter extends CustomPainter {
   final int currentRound;
   final double pulseProgress;
@@ -425,12 +425,11 @@ class BracketRailsPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final double cardHeight = 90.0;
     final double verticalGap = (size.height - (cardHeight * 3)) / 2;
-    final double startX = 40.0; // Align with center of avatar circle
+    final double startX = 40.0;
     final double y1 = cardHeight / 2;
     final double y2 = y1 + cardHeight + verticalGap;
     final double y3 = y2 + cardHeight + verticalGap;
 
-    // Line segment 1: Round 0 -> Round 1
     _drawRailSegment(
       canvas: canvas,
       start: Offset(startX, y1 + 24),
@@ -439,7 +438,6 @@ class BracketRailsPainter extends CustomPainter {
       isPulsing: currentRound == 0,
     );
 
-    // Line segment 2: Round 1 -> Round 2
     _drawRailSegment(
       canvas: canvas,
       start: Offset(startX, y2 + 24),
@@ -471,7 +469,6 @@ class BracketRailsPainter extends CustomPainter {
       )!;
       basePaint.strokeWidth = 4.0;
 
-      // Outer Glow Line
       final glowPaint = Paint()
         ..color = Colors.amberAccent.withOpacity(0.4 * pulseProgress)
         ..strokeWidth = 8.0

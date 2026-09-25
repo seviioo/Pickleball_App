@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../game/pickleball_game.dart';
+import '../models/game_models.dart';
 
 class PerspectiveCourtPainter extends CustomPainter {
   final double ballX;
@@ -37,7 +37,7 @@ class PerspectiveCourtPainter extends CustomPainter {
     required this.isAiShrunk,
     this.timingFeedback,
     required this.playerColor,
-    this.isUltimateActive = false,
+    required this.isUltimateActive,
     required this.playerAnimState,
     required this.aiAnimState,
     required this.playerFrame,
@@ -46,134 +46,88 @@ class PerspectiveCourtPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final darkAsphaltPaint = Paint()
-      ..color = const Color(0xFF09090B)
-      ..style = PaintingStyle.fill;
-    canvas.drawRect(Offset.zero & size, darkAsphaltPaint);
+    final double width = size.width;
+    final double height = size.height;
 
-    final streetGradient = LinearGradient(
-      begin: Alignment.topCenter,
-      end: Alignment.bottomCenter,
-      colors: [
-        const Color(0xFF18181B),
-        const Color(0xFF09090B),
-      ],
-    );
-    canvas.drawRect(
-      Offset.zero & size,
-      Paint()..shader = streetGradient.createShader(Offset.zero & size),
-    );
+    // Perspective Court Points
+    final Offset netLeft = Offset(width * 0.15, height * 0.45);
+    final Offset netRight = Offset(width * 0.85, height * 0.45);
+    final Offset farLeft = Offset(width * 0.28, height * 0.12);
+    final Offset farRight = Offset(width * 0.72, height * 0.12);
+    final Offset nearLeft = Offset(width * 0.05, height * 0.88);
+    final Offset nearRight = Offset(width * 0.95, height * 0.88);
 
-    final double topWidth = size.width * 0.40;
-    final double bottomWidth = size.width * 0.84;
-    final double topY = size.height * 0.16;
-    final double bottomY = size.height * 0.88;
-    final double centerX = size.width / 2;
-
-    Offset perspectiveTransform(double normX, double normY) {
-      double progressY = (normY + 1.0) / 2.0;
-      double currentY = topY + progressY * (bottomY - topY);
-      double currentWidth = topWidth + progressY * (bottomWidth - topWidth);
-      double currentX = centerX + (normX * currentWidth / 2);
-      return Offset(currentX, currentY);
-    }
-
-    // Court Surface
+    // Court Floor
     final Path courtPath = Path()
-      ..moveTo(perspectiveTransform(-1.0, -1.0).dx,
-          perspectiveTransform(-1.0, -1.0).dy)
-      ..lineTo(perspectiveTransform(1.0, -1.0).dx,
-          perspectiveTransform(-1.0, -1.0).dy)
-      ..lineTo(
-          perspectiveTransform(1.0, 1.0).dx, perspectiveTransform(1.0, 1.0).dy)
-      ..lineTo(perspectiveTransform(-1.0, 1.0).dx,
-          perspectiveTransform(-1.0, 1.0).dy)
+      ..moveTo(farLeft.dx, farLeft.dy)
+      ..lineTo(farRight.dx, farRight.dy)
+      ..lineTo(nearRight.dx, nearRight.dy)
+      ..lineTo(nearLeft.dx, nearLeft.dy)
       ..close();
 
-    canvas.drawPath(
-      courtPath,
-      Paint()
-        ..color = const Color(0xFF27272A)
-        ..style = PaintingStyle.fill,
-    );
+    final Paint courtPaint = Paint()
+      ..color = const Color(0xFF1E293B)
+      ..style = PaintingStyle.fill;
+    canvas.drawPath(courtPath, courtPaint);
 
-    // Kitchen (NVZ) Surface
-    final Path kitchenPath = Path()
-      ..moveTo(perspectiveTransform(-1.0, -0.32).dx,
-          perspectiveTransform(-1.0, -0.32).dy)
-      ..lineTo(perspectiveTransform(1.0, -0.32).dx,
-          perspectiveTransform(1.0, -0.32).dy)
-      ..lineTo(perspectiveTransform(1.0, 0.32).dx,
-          perspectiveTransform(1.0, 0.32).dy)
-      ..lineTo(perspectiveTransform(-1.0, 0.32).dx,
-          perspectiveTransform(-1.0, 0.32).dy)
-      ..close();
-
-    canvas.drawPath(
-      kitchenPath,
-      Paint()
-        ..color = const Color(0xFF991B1B)
-        ..style = PaintingStyle.fill,
-    );
-
-    // Court Lines
+    // Court Outer Border
     final Paint linePaint = Paint()
-      ..color = const Color(0xFFF4F4F5)
-      ..strokeWidth = 3.5
+      ..color = Colors.white
+      ..strokeWidth = 3.0
       ..style = PaintingStyle.stroke;
-
     canvas.drawPath(courtPath, linePaint);
-    Offset netLeft = perspectiveTransform(-1.0, 0.0);
-    Offset netRight = perspectiveTransform(1.0, 0.0);
-    canvas.drawLine(netLeft, netRight, linePaint);
-    canvas.drawLine(perspectiveTransform(-1.0, -0.32),
-        perspectiveTransform(1.0, -0.32), linePaint);
-    canvas.drawLine(perspectiveTransform(-1.0, 0.32),
-        perspectiveTransform(1.0, 0.32), linePaint);
-    canvas.drawLine(perspectiveTransform(0.0, -1.0),
-        perspectiveTransform(0.0, -0.32), linePaint);
-    canvas.drawLine(perspectiveTransform(0.0, 0.32),
-        perspectiveTransform(0.0, 1.0), linePaint);
 
-    // Net Mesh
-    final double netHeightPx = size.height * 0.075;
-    final Offset netTopLeft = Offset(netLeft.dx - 3, netLeft.dy - netHeightPx);
-    final Offset netTopRight =
-        Offset(netRight.dx + 3, netRight.dy - netHeightPx);
+    // Net
+    final Paint netPaint = Paint()
+      ..color = Colors.white70
+      ..strokeWidth = 4.0;
+    canvas.drawLine(netLeft, netRight, netPaint);
 
-    final Path netMeshPath = Path()
-      ..moveTo(netLeft.dx, netLeft.dy)
-      ..lineTo(netRight.dx, netRight.dy)
-      ..lineTo(netTopRight.dx, netTopRight.dy)
-      ..lineTo(netTopLeft.dx, netTopLeft.dy)
+    // Kitchen Area
+    final double kitchenNearY = height * 0.58;
+    final double kitchenFarY = height * 0.32;
+
+    final Offset kitchenNearL = Offset(width * 0.11, kitchenNearY);
+    final Offset kitchenNearR = Offset(width * 0.89, kitchenNearY);
+    final Offset kitchenFarL = Offset(width * 0.22, kitchenFarY);
+    final Offset kitchenFarR = Offset(width * 0.78, kitchenFarY);
+
+    final Paint kitchenPaint = Paint()
+      ..color = const Color(0xFF0EA5E9).withOpacity(0.3)
+      ..style = PaintingStyle.fill;
+
+    final Path kitchenPath = Path()
+      ..moveTo(kitchenFarL.dx, kitchenFarL.dy)
+      ..lineTo(kitchenFarR.dx, kitchenFarR.dy)
+      ..lineTo(kitchenNearR.dx, kitchenNearR.dy)
+      ..lineTo(kitchenNearL.dx, kitchenNearL.dy)
       ..close();
+    canvas.drawPath(kitchenPath, kitchenPaint);
 
-    canvas.drawPath(
-        netMeshPath, Paint()..color = Colors.black.withOpacity(0.55));
+    canvas.drawLine(kitchenFarL, kitchenFarR, linePaint);
+    canvas.drawLine(kitchenNearL, kitchenNearR, linePaint);
+
+    // Center Baseline Splits
     canvas.drawLine(
-      netTopLeft,
-      netTopRight,
-      Paint()
-        ..color = const Color(0xFFFACC15)
-        ..strokeWidth = 4.0
-        ..strokeCap = StrokeCap.round,
+      Offset((nearLeft.dx + nearRight.dx) / 2, kitchenNearY),
+      Offset((nearLeft.dx + nearRight.dx) / 2, nearLeft.dy),
+      linePaint,
     );
-
-    final Paint postPaint = Paint()
-      ..color = const Color(0xFF71717A)
-      ..strokeWidth = 6.0
-      ..strokeCap = StrokeCap.round;
-    canvas.drawLine(netLeft,
-        Offset(netLeft.dx - 2, netLeft.dy - netHeightPx * 1.05), postPaint);
-    canvas.drawLine(netRight,
-        Offset(netRight.dx + 2, netRight.dy - netHeightPx * 1.05), postPaint);
+    canvas.drawLine(
+      Offset((farLeft.dx + farRight.dx) / 2, kitchenFarY),
+      Offset((farLeft.dx + farRight.dx) / 2, farLeft.dy),
+      linePaint,
+    );
 
     // Power Orbs
     if (orbX != null && orbY != null && orbType != null) {
-      Offset orbPos = perspectiveTransform(orbX!, orbY!);
-      Color orbColor = const Color(0xFFF97316);
-      if (orbType == OrbType.shrinkRay) orbColor = const Color(0xFFA855F7);
-      if (orbType == OrbType.doublePoints) orbColor = const Color(0xFFEAB308);
+      final Offset orbPos = perspectiveTransform(orbX!, orbY!, width, height);
+      Color orbColor = const Color(0xFF38BDF8);
+      if (orbType == OrbType.shrinkRay || orbType == OrbType.shrinkOpponent) {
+        orbColor = const Color(0xFFFA855F);
+      } else if (orbType == OrbType.doublePoints) {
+        orbColor = const Color(0xFFEAB308);
+      }
 
       canvas.drawCircle(
         orbPos,
@@ -186,86 +140,107 @@ class PerspectiveCourtPainter extends CustomPainter {
       canvas.drawCircle(orbPos, 6, Paint()..color = Colors.white);
     }
 
-    // AI Chibi Render
-    Offset oppPos = perspectiveTransform(opponentX, opponentY);
+    // AI Opponent
+    final Offset oppPos =
+        perspectiveTransform(opponentX, opponentY, width, height);
     _drawAnimatedChibi(
-      canvas,
+      canvas: canvas,
       position: oppPos,
-      scale: 0.72,
-      shirtColor: const Color(0xFF1E3A8A),
+      color: Colors.redAccent,
       isPlayer: false,
-      isShrunk: isAiShrunk,
+      scale: isAiShrunk ? 0.6 : 0.9,
       animState: aiAnimState,
       frame: aiFrame,
     );
 
-    // Player Chibi Render
-    Offset playerPos = perspectiveTransform(playerX, playerY);
+    // Player
+    final Offset playerPos =
+        perspectiveTransform(playerX, playerY, width, height);
     _drawAnimatedChibi(
-      canvas,
+      canvas: canvas,
       position: playerPos,
-      scale: 1.1,
-      shirtColor: playerColor,
+      color: playerColor,
       isPlayer: true,
+      scale: 1.2,
       isGlowing: isUltimateActive,
       animState: playerAnimState,
       frame: playerFrame,
     );
 
-    // Pickleball & Shadow
-    Offset ballCourtPos = perspectiveTransform(ballX, ballY);
-    double renderBallY = ballCourtPos.dy - (ballHeight * 60.0);
-    final Offset ballCenter = Offset(ballCourtPos.dx, renderBallY);
+    // Ball & Shadow
+    final Offset ballPos = perspectiveTransform(ballX, ballY, width, height);
+    final double shadowOffsetY = 15.0 * (1.0 - ballY.abs());
 
-    double shadowWidth = (20.0 - ballHeight * 6.0).clamp(6.0, 20.0);
-    double shadowHeight = (10.0 - ballHeight * 3.0).clamp(3.0, 10.0);
     canvas.drawOval(
       Rect.fromCenter(
-          center: ballCourtPos, width: shadowWidth, height: shadowHeight),
-      Paint()..color = Colors.black54,
+        center: Offset(ballPos.dx, ballPos.dy + shadowOffsetY),
+        width: 16 * (1.0 - ballHeight * 0.3),
+        height: 8 * (1.0 - ballHeight * 0.3),
+      ),
+      Paint()..color = Colors.black45,
     );
 
-    Color ballColor = isDoublePointsActive
-        ? const Color(0xFFEAB308)
-        : const Color(0xFFFACC15);
-    canvas.drawCircle(ballCenter, 9.0, Paint()..color = ballColor);
-
-    final Paint holePaint = Paint()..color = Colors.black45;
+    final Offset floatingBallPos = Offset(
+      ballPos.dx,
+      ballPos.dy - (ballHeight * 60.0),
+    );
     canvas.drawCircle(
-        Offset(ballCenter.dx - 2, ballCenter.dy - 2), 1.0, holePaint);
+      floatingBallPos,
+      10,
+      Paint()..color = const Color(0xFFCCFF00),
+    );
     canvas.drawCircle(
-        Offset(ballCenter.dx + 2, ballCenter.dy - 1), 1.0, holePaint);
-    canvas.drawCircle(Offset(ballCenter.dx, ballCenter.dy + 2), 1.0, holePaint);
+      floatingBallPos,
+      10,
+      Paint()
+        ..color = Colors.black26
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.5,
+    );
 
-    if (timingFeedback != null && timingFeedback!.isNotEmpty) {
-      final textSpan = TextSpan(
-        text: timingFeedback,
-        style: const TextStyle(
-          color: Color(0xFFFACC15),
-          fontSize: 22,
-          fontWeight: FontWeight.w900,
-          fontStyle: FontStyle.italic,
-          shadows: [
-            Shadow(offset: Offset(1.5, 1.5), color: Colors.black, blurRadius: 4)
-          ],
+    // Hit Timing Feedback Banner
+    if (timingFeedback != null) {
+      final textPainter = TextPainter(
+        text: TextSpan(
+          text: timingFeedback,
+          style: const TextStyle(
+            color: Color(0xFFFACC15),
+            fontSize: 18,
+            fontWeight: FontWeight.w900,
+            shadows: [Shadow(color: Colors.black, blurRadius: 6)],
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      textPainter.paint(
+        canvas,
+        Offset(
+          playerPos.dx - (textPainter.width / 2),
+          playerPos.dy - 90,
         ),
       );
-      final textPainter =
-          TextPainter(text: textSpan, textDirection: TextDirection.ltr)
-            ..layout();
-      textPainter.paint(canvas,
-          Offset(playerPos.dx - textPainter.width / 2, playerPos.dy - 85));
     }
   }
 
-  void _drawAnimatedChibi(
-    Canvas canvas, {
+  Offset perspectiveTransform(
+      double normX, double normY, double width, double height) {
+    final double tY = (normY + 1.0) / 2.0;
+    final double screenY = height * (0.15 + (tY * 0.72));
+
+    final double rowWidth = width * (0.44 + (tY * 0.50));
+    final double centerX = width / 2;
+    final double screenX = centerX + (normX * (rowWidth / 2));
+
+    return Offset(screenX, screenY);
+  }
+
+  void _drawAnimatedChibi({
+    required Canvas canvas,
     required Offset position,
-    required double scale,
-    required Color shirtColor,
+    required Color color,
     required bool isPlayer,
+    required double scale,
     bool isGlowing = false,
-    bool isShrunk = false,
     required CharacterAnimState animState,
     required int frame,
   }) {
@@ -273,9 +248,19 @@ class PerspectiveCourtPainter extends CustomPainter {
     canvas.translate(position.dx, position.dy);
     canvas.scale(scale);
 
-    final Paint skinPaint = Paint()..color = const Color(0xFFFDBA74);
+    final Paint bodyPaint = Paint()..color = color;
+    final Paint skinPaint = Paint()..color = const Color(0xFFFFDBA7);
 
-    // Directional Leg Cycling Animations
+    if (isGlowing) {
+      canvas.drawCircle(
+        Offset.zero,
+        35,
+        Paint()
+          ..color = Colors.amberAccent.withOpacity(0.5)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 12),
+      );
+    }
+
     double legOffsetLeft = (frame % 2 == 0) ? -3.0 : 3.0;
     double legOffsetRight = (frame % 2 == 0) ? 3.0 : -3.0;
 
@@ -295,38 +280,37 @@ class PerspectiveCourtPainter extends CustomPainter {
       skinPaint,
     );
 
-    // Shorts & Shirt
+    // Torso
     canvas.drawRRect(
-      RRect.fromLTRBR(-10, -22, 10, -10, const Radius.circular(4)),
-      Paint()..color = const Color(0xFF18181B),
-    );
-    canvas.drawRRect(
-      RRect.fromLTRBR(-11, -38, 11, -20, const Radius.circular(6)),
-      Paint()..color = shirtColor,
+      RRect.fromLTRBR(-12, -32, 12, -12, const Radius.circular(6)),
+      bodyPaint,
     );
 
     // Head
-    canvas.drawCircle(const Offset(0, -50), 16, skinPaint);
-    canvas.drawArc(
-      Rect.fromCircle(center: const Offset(0, -54), radius: 17),
-      3.14,
-      3.14,
-      true,
-      Paint()..color = const Color(0xFF27272A),
-    );
+    canvas.drawCircle(const Offset(0, -42), 16, skinPaint);
 
-    // Contextual Shot & Paddle Angles
+    // Eyes
+    final Paint eyePaint = Paint()..color = Colors.black;
+    if (isPlayer) {
+      canvas.drawCircle(const Offset(-5, -44), 2.5, eyePaint);
+      canvas.drawCircle(const Offset(5, -44), 2.5, eyePaint);
+    } else {
+      canvas.drawCircle(const Offset(-5, -40), 2.5, eyePaint);
+      canvas.drawCircle(const Offset(5, -40), 2.5, eyePaint);
+    }
+
     Offset paddleHand =
-        isPlayer ? const Offset(14, -28) : const Offset(-14, -28);
+        isPlayer ? const Offset(18, -26) : const Offset(-18, -26);
     double paddleAngle = 0.0;
-    double paddleScale = isShrunk ? 0.5 : 1.0;
 
     switch (animState) {
       case CharacterAnimState.smash:
-        paddleHand = isPlayer ? const Offset(10, -68) : const Offset(-10, -68);
+      case CharacterAnimState.hit:
+        paddleHand = isPlayer ? const Offset(10, -50) : const Offset(-10, -50);
         paddleAngle = isPlayer ? -0.4 : 0.4;
         break;
       case CharacterAnimState.slice:
+      case CharacterAnimState.run:
         paddleHand = isPlayer ? const Offset(20, -18) : const Offset(-20, -18);
         paddleAngle = isPlayer ? 0.8 : -0.8;
         break;
@@ -335,6 +319,7 @@ class PerspectiveCourtPainter extends CustomPainter {
         paddleAngle = isPlayer ? -0.9 : 0.9;
         break;
       case CharacterAnimState.serving:
+      case CharacterAnimState.serve:
         paddleHand = isPlayer ? const Offset(18, -22) : const Offset(-18, -22);
         paddleAngle = isPlayer ? 0.5 : -0.5;
         break;
@@ -342,24 +327,28 @@ class PerspectiveCourtPainter extends CustomPainter {
         paddleHand = isPlayer ? const Offset(18, -32) : const Offset(-18, -32);
         paddleAngle = isPlayer ? -0.2 : 0.2;
         break;
+      case CharacterAnimState.idle:
       default:
+        paddleHand = isPlayer ? const Offset(18, -26) : const Offset(-18, -26);
+        paddleAngle = 0.0;
         break;
     }
 
+    // Draw Paddle
     canvas.save();
     canvas.translate(paddleHand.dx, paddleHand.dy);
     canvas.rotate(paddleAngle);
-    canvas.scale(paddleScale);
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromCenter(center: Offset.zero, width: 14, height: 18),
-        const Radius.circular(4),
-      ),
-      Paint()
-        ..color = isGlowing ? const Color(0xFFF97316) : const Color(0xFFEF4444),
-    );
-    canvas.restore();
 
+    final Paint paddleHeadPaint = Paint()..color = const Color(0xFF22C55E);
+    final Paint paddleHandlePaint = Paint()..color = const Color(0xFF78350F);
+
+    canvas.drawRect(const Rect.fromLTWH(-2, 0, 4, 10), paddleHandlePaint);
+    canvas.drawRRect(
+      RRect.fromLTRBR(-8, -18, 8, 0, const Radius.circular(4)),
+      paddleHeadPaint,
+    );
+
+    canvas.restore();
     canvas.restore();
   }
 

@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/game_models.dart';
-import '../services/audio_service.dart';
 import '../services/storage_service.dart';
-import '../theme/app_theme.dart';
 import 'equipment_screen.dart';
 import 'match_setup_screen.dart';
 import 'practice_tutorial_screen.dart';
@@ -14,31 +12,29 @@ class LobbyScreen extends StatefulWidget {
   final CharacterStyleData characterStyle;
 
   const LobbyScreen({
-    super.key,
+    Key? key,
     required this.userName,
     required this.characterStyle,
-  });
+  }) : super(key: key);
 
   @override
   State<LobbyScreen> createState() => _LobbyScreenState();
 }
 
 class _LobbyScreenState extends State<LobbyScreen> {
-  int _userCoins = 0;
-  int _userXp = 0;
-  int _userWins = 0;
-  int _userLosses = 0;
+  int _coins = 0;
+  int _xp = 0;
+  int _wins = 0;
+  int _losses = 0;
   bool _canClaimDaily = false;
-  late String _currentUserName;
 
   @override
   void initState() {
     super.initState();
-    _currentUserName = widget.userName;
-    _refreshUserData();
+    _loadUserData();
   }
 
-  Future<void> _refreshUserData() async {
+  Future<void> _loadUserData() async {
     final coins = await StorageService.getCoins();
     final xp = await StorageService.getXp();
     final wins = await StorageService.getWins();
@@ -47,29 +43,23 @@ class _LobbyScreenState extends State<LobbyScreen> {
 
     if (mounted) {
       setState(() {
-        _userCoins = coins;
-        _userXp = xp;
-        _userWins = wins;
-        _userLosses = losses;
+        _coins = coins;
+        _xp = xp;
+        _wins = wins;
+        _losses = losses;
         _canClaimDaily = canClaim;
       });
     }
   }
 
   Future<void> _claimDailyStash() async {
-    if (_canClaimDaily) {
-      await StorageService.claimDailyStash();
-      AudioService.playShotSfx('SMASH');
-      await _refreshUserData();
-      if (!mounted) return;
+    await StorageService.claimDailyStash();
+    await _loadUserData();
+    if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          backgroundColor: AppColors.surface,
-          content: Text(
-            'CLAIMED DAILY STASH: +150 COINS & +100 XP!',
-            style:
-                TextStyle(color: AppColors.gold, fontWeight: FontWeight.w900),
-          ),
+          content: Text('CLAIMED 150 COINS & 100 XP!'),
+          backgroundColor: Colors.amberAccent,
         ),
       );
     }
@@ -78,216 +68,294 @@ class _LobbyScreenState extends State<LobbyScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.void_,
-      body: StreetBackground(
-        child: SafeArea(
-          child: Padding(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 20.0, vertical: 12.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Top Player Header Bar
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Kicker('STREET TAG',
-                            icon: Icons.person_pin_rounded),
-                        const SizedBox(height: 2),
-                        Text(
-                          _currentUserName,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 22,
-                            fontWeight: FontWeight.w900,
-                          ),
+      backgroundColor: const Color(0xFF0F1115),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(20.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Top Bar
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'WELCOME BACK,',
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.6),
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1.2,
                         ),
+                      ),
+                      Text(
+                        widget.userName.toUpperCase(),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 22,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ],
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.settings, color: Colors.white70),
+                    onPressed: () async {
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (context) => const SettingsScreen()),
+                      );
+                      _loadUserData();
+                    },
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+
+              // Stats Row
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildStatCard('COINS', '$_coins',
+                        Icons.monetization_on, Colors.amberAccent),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _buildStatCard(
+                        'STREET XP', '$_xp', Icons.bolt, Colors.cyanAccent),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _buildStatCard('RECORD', '$_wins W - $_losses L',
+                        Icons.emoji_events, Colors.greenAccent),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+
+              // Daily Stash Banner
+              if (_canClaimDaily)
+                GestureDetector(
+                  onTap: _claimDailyStash,
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF8B5CF6), Color(0xFF6366F1)],
+                      ),
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Colors.indigo,
+                          blurRadius: 12,
+                          spreadRadius: 1,
+                        )
                       ],
                     ),
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: AppColors.surface,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                                color: AppColors.hairline, width: 1.5),
-                          ),
-                          child: Row(
+                    child: Row(
+                      children: const [
+                        Icon(Icons.card_giftcard,
+                            color: Colors.white, size: 32),
+                        SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Icon(Icons.monetization_on,
-                                  color: AppColors.gold, size: 18),
-                              const SizedBox(width: 6),
                               Text(
-                                '$_userCoins',
-                                style: const TextStyle(
+                                'DAILY STASH READY!',
+                                style: TextStyle(
                                   color: Colors.white,
-                                  fontSize: 14,
                                   fontWeight: FontWeight.w900,
+                                  fontSize: 15,
+                                ),
+                              ),
+                              Text(
+                                'Tap to claim 150 Coins & 100 XP',
+                                style: TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 12,
                                 ),
                               ),
                             ],
                           ),
                         ),
-                        const SizedBox(width: 8),
-                        IconButton(
-                          icon: const Icon(Icons.settings_rounded,
-                              color: AppColors.textSecondary),
-                          onPressed: () async {
-                            await Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => SettingsScreen(
-                                  currentUserName: _currentUserName,
-                                  onUserNameChanged: (newName) {
-                                    setState(() => _currentUserName = newName);
-                                    StorageService.saveUserName(newName);
-                                  },
-                                  onResetProgress: () => _refreshUserData(),
-                                ),
-                              ),
-                            );
-                            _refreshUserData();
-                          },
-                        ),
+                        Icon(Icons.arrow_forward_ios,
+                            color: Colors.white, size: 16),
                       ],
                     ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-
-                // Street Stats & Daily Stash Card
-                StreetCard(
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'RECORD: $_userWins W - $_userLosses L',
-                            style: const TextStyle(
-                              color: AppColors.win,
-                              fontWeight: FontWeight.w900,
-                              fontSize: 13,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'REP XP: $_userXp PTS',
-                            style: const TextStyle(
-                              color: AppColors.textSecondary,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ],
-                      ),
-                      ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: _canClaimDaily
-                              ? AppColors.gold
-                              : AppColors.surfaceRaised,
-                          foregroundColor: _canClaimDaily
-                              ? Colors.black
-                              : AppColors.textFaint,
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10)),
-                        ),
-                        onPressed: _canClaimDaily ? _claimDailyStash : null,
-                        icon: const Icon(Icons.card_giftcard_rounded, size: 18),
-                        label: Text(
-                          _canClaimDaily ? 'DAILY STASH' : 'CLAIMED',
-                          style: const TextStyle(
-                              fontWeight: FontWeight.w900, fontSize: 11),
-                        ),
-                      ),
-                    ],
                   ),
                 ),
-                const SizedBox(height: 24),
+              if (_canClaimDaily) const SizedBox(height: 20),
 
-                // Navigation Grid Buttons
-                const Kicker('SELECT MODE'),
-                const SizedBox(height: 10),
-                Expanded(
-                  child: ListView(
-                    children: [
-                      PrimaryCTA(
-                        label: 'QUICK MATCH',
-                        icon: Icons.flash_on_rounded,
-                        onPressed: () async {
-                          await Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => MatchSetupScreen(
-                                userName: _currentUserName,
-                                characterStyle: widget.characterStyle,
-                              ),
-                            ),
-                          );
-                          _refreshUserData();
-                        },
+              // Main Menu Options
+              _buildMenuCard(
+                title: 'QUICK MATCH',
+                subtitle: 'Jump into an instant court match against AI',
+                icon: Icons.sports_tennis,
+                color: Colors.amberAccent,
+                onTap: () async {
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => MatchSetupScreen(
+                        userName: widget.userName,
+                        characterStyle: widget.characterStyle,
                       ),
-                      const SizedBox(height: 12),
-                      SecondaryButton(
-                        label: 'UNDERGROUND BRACKET',
-                        icon: Icons.emoji_events_rounded,
-                        accent: AppColors.gold,
-                        onPressed: () async {
-                          await Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const TournamentScreen(),
-                            ),
-                          );
-                          _refreshUserData();
-                        },
-                      ),
-                      const SizedBox(height: 12),
-                      SecondaryButton(
-                        label: 'BLACK MARKET GEAR',
-                        icon: Icons.shopping_bag_rounded,
-                        accent: AppColors.redBright,
-                        onPressed: () async {
-                          await Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => EquipmentScreen(
-                                userName: _currentUserName,
-                                characterStyle: widget.characterStyle,
-                              ),
-                            ),
-                          );
-                          _refreshUserData();
-                        },
-                      ),
-                      const SizedBox(height: 12),
-                      SecondaryButton(
-                        label: 'STREET ACADEMY (TUTORIAL)',
-                        icon: Icons.school_rounded,
-                        accent: Colors.cyanAccent,
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) =>
-                                  const PracticeTutorialScreen(),
-                            ),
-                          );
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+                    ),
+                  );
+                  _loadUserData();
+                },
+              ),
+              const SizedBox(height: 12),
+
+              _buildMenuCard(
+                title: 'UNDERGROUND TOURNAMENT',
+                subtitle: 'Climb the bracket to win the Grand Prize Purse',
+                icon: Icons.emoji_events,
+                color: Colors.orangeAccent,
+                onTap: () async {
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const TournamentScreen(),
+                    ),
+                  );
+                  _loadUserData();
+                },
+              ),
+              const SizedBox(height: 12),
+
+              _buildMenuCard(
+                title: 'BLACK MARKET GEAR',
+                subtitle: 'Unlock & equip high performance paddles',
+                icon: Icons.shopping_bag,
+                color: Colors.purpleAccent,
+                onTap: () async {
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const EquipmentScreen(),
+                    ),
+                  );
+                  _loadUserData();
+                },
+              ),
+              const SizedBox(height: 12),
+
+              _buildMenuCard(
+                title: 'PRACTICE & TUTORIAL',
+                subtitle: 'Master dinks, drives, and kitchen rules',
+                icon: Icons.school,
+                color: Colors.cyanAccent,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const PracticeTutorialScreen(),
+                    ),
+                  );
+                },
+              ),
+            ],
+          ), // Column
+        ), // SingleChildScrollView
+      ), // SafeArea
+    ); // Scaffold
+  }
+
+  Widget _buildStatCard(
+      String label, String value, IconData icon, Color color) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1F232C),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: color, size: 18),
+          const SizedBox(height: 8),
+          Text(
+            label,
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.5),
+              fontSize: 9,
+              fontWeight: FontWeight.bold,
             ),
           ),
+          const SizedBox(height: 2),
+          Text(
+            value,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 14,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMenuCard({
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1F232C),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.white10),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: color, size: 28),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 15,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.6),
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.arrow_forward_ios,
+                color: Colors.white24, size: 16),
+          ],
         ),
       ),
     );

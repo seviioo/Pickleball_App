@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../services/storage_service.dart';
 
 class MatchSummaryScreen extends StatefulWidget {
   final String? userName;
@@ -15,6 +16,8 @@ class MatchSummaryScreen extends StatefulWidget {
   final int longestRally;
   final bool leveledUp;
   final int newLevel;
+  final bool isTournamentMatch;
+  final int tournamentRound;
 
   const MatchSummaryScreen({
     Key? key,
@@ -32,6 +35,8 @@ class MatchSummaryScreen extends StatefulWidget {
     this.longestRally = 0,
     this.leveledUp = false,
     this.newLevel = 1,
+    this.isTournamentMatch = false,
+    this.tournamentRound = 0,
   }) : super(key: key);
 
   @override
@@ -46,17 +51,14 @@ class _MatchSummaryScreenState extends State<MatchSummaryScreen>
   @override
   void initState() {
     super.initState();
-
     _counterController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1800),
     );
-
     _counterAnimation = CurvedAnimation(
       parent: _counterController,
       curve: Curves.easeOutCubic,
     );
-
     _counterController.forward().then((_) {
       if (widget.leveledUp && mounted) {
         _showLevelUpOverlay();
@@ -162,7 +164,6 @@ class _MatchSummaryScreenState extends State<MatchSummaryScreen>
   Widget build(BuildContext context) {
     final bool isWin =
         widget.playerScore >= widget.opponentScore && widget.isVictory;
-
     return Scaffold(
       backgroundColor: const Color(0xFF0F1115),
       body: SafeArea(
@@ -172,35 +173,20 @@ class _MatchSummaryScreenState extends State<MatchSummaryScreen>
             final double progress = _counterAnimation.value;
             final int displayCoins = (widget.coinsEarned * progress).round();
             final int displayXp = (widget.xpEarned * progress).round();
-
             return Padding(
               padding:
                   const EdgeInsets.symmetric(horizontal: 20.0, vertical: 16.0),
               child: Column(
                 children: [
                   const SizedBox(height: 16),
-
-                  // 1. Result Title Header
                   _buildResultHeader(isWin),
-
                   const SizedBox(height: 20),
-
-                  // 2. Scoreboard Banner
                   _buildScoreboardCard(),
-
                   const SizedBox(height: 24),
-
-                  // 3. Reward Counters
                   _buildRewardsContainer(displayCoins, displayXp),
-
                   const SizedBox(height: 24),
-
-                  // 4. Match Breakdown Card
                   _buildMatchBreakdownCard(),
-
                   const Spacer(),
-
-                  // 5. Continue CTA Button
                   _buildContinueButton(isWin),
                 ],
               ),
@@ -215,7 +201,6 @@ class _MatchSummaryScreenState extends State<MatchSummaryScreen>
     final Color headerColor = isWin ? Colors.amberAccent : Colors.redAccent;
     final String titleText = isWin ? 'VICTORY!' : 'DEFEATED';
     final IconData headerIcon = isWin ? Icons.emoji_events : Icons.heart_broken;
-
     return Column(
       children: [
         Icon(headerIcon, color: headerColor, size: 56),
@@ -430,7 +415,36 @@ class _MatchSummaryScreenState extends State<MatchSummaryScreen>
       width: double.infinity,
       height: 54,
       child: ElevatedButton(
-        onPressed: () => Navigator.pop(context),
+        onPressed: () async {
+          if (isWin) {
+            int coinsToAward = widget.coinsEarned;
+            int xpToAward = widget.xpEarned;
+
+            if (widget.isTournamentMatch) {
+              final nextRound = widget.tournamentRound + 1;
+              await StorageService.setTournamentRound(nextRound);
+
+              if (widget.tournamentRound == 2) {
+                coinsToAward += 1500;
+                xpToAward += 500;
+              }
+            }
+
+            final currentCoins = await StorageService.getCoins();
+            final currentXp = await StorageService.getXp();
+            final currentWins = await StorageService.getWins();
+
+            await StorageService.setCoins(currentCoins + coinsToAward);
+            await StorageService.setXp(currentXp + xpToAward);
+            await StorageService.setWins(currentWins + 1);
+          } else {
+            final currentLosses = await StorageService.getLosses();
+            await StorageService.setLosses(currentLosses + 1);
+          }
+
+          if (!mounted) return;
+          Navigator.pop(context);
+        },
         style: ElevatedButton.styleFrom(
           backgroundColor: isWin ? Colors.amberAccent : Colors.white24,
           shape: RoundedRectangleBorder(
@@ -439,7 +453,11 @@ class _MatchSummaryScreenState extends State<MatchSummaryScreen>
           elevation: 4,
         ),
         child: Text(
-          'RETURN TO STREETS',
+          widget.isTournamentMatch && isWin
+              ? (widget.tournamentRound == 2
+                  ? 'CLAIM GRAND PRIZE'
+                  : 'ADVANCE BRACKET')
+              : 'RETURN TO STREETS',
           style: TextStyle(
             color: isWin ? Colors.black : Colors.white,
             fontWeight: FontWeight.w900,

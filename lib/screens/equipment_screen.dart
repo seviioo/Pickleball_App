@@ -1,469 +1,284 @@
 import 'package:flutter/material.dart';
 import '../models/game_models.dart';
-import '../services/audio_service.dart';
 import '../services/storage_service.dart';
-import '../theme/app_theme.dart';
 
 class EquipmentScreen extends StatefulWidget {
-  final String userName;
-  final CharacterStyleData characterStyle;
-
-  const EquipmentScreen({
-    super.key,
-    required this.userName,
-    required this.characterStyle,
-  });
+  const EquipmentScreen({Key? key}) : super(key: key);
 
   @override
   State<EquipmentScreen> createState() => _EquipmentScreenState();
 }
 
 class _EquipmentScreenState extends State<EquipmentScreen> {
-  int userCoins = 0;
-  List<PaddleData> availablePaddles = [];
-  PaddleData equippedPaddle = PaddleData.starter();
-  PaddleData? selectedPaddle;
+  List<PaddleData> _paddles = [];
+  PaddleData? _equippedPaddle;
+  int _userCoins = 0;
+  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _loadStoreData();
+    _loadData();
   }
 
-  Future<void> _loadStoreData() async {
-    final coins = await StorageService.getCoins();
+  Future<void> _loadData() async {
     final paddles = await StorageService.getPaddles();
     final equipped = await StorageService.getEquippedPaddle();
+    final coins = await StorageService.getCoins();
 
     if (mounted) {
       setState(() {
-        userCoins = coins;
-        availablePaddles = paddles;
-        equippedPaddle = equipped;
-        selectedPaddle ??= equipped;
+        _paddles = paddles;
+        _equippedPaddle = equipped;
+        _userCoins = coins;
+        _isLoading = false;
       });
     }
   }
 
   Future<void> _equipPaddle(PaddleData paddle) async {
     await StorageService.setEquippedPaddle(paddle);
-    AudioService.playShotSfx('DRIVE');
-    await _loadStoreData();
+    await _loadData();
   }
 
-  Future<void> _buyPaddle(PaddleData paddle) async {
-    if (userCoins >= paddle.price) {
-      await StorageService.setCoins(userCoins - paddle.price);
+  Future<void> _unlockPaddle(PaddleData paddle) async {
+    if (_userCoins >= paddle.price) {
+      await StorageService.setCoins(_userCoins - paddle.price);
       await StorageService.unlockPaddle(paddle.id);
       await StorageService.setEquippedPaddle(paddle);
-      AudioService.playShotSfx('SMASH');
-      await _loadStoreData();
-
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: AppColors.surface,
-          content: Text(
-            '${paddle.name.toUpperCase()} UNLOCKED & EQUIPPED!',
-            style: const TextStyle(
-                color: AppColors.gold, fontWeight: FontWeight.w900),
+      await _loadData();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content:
+                Text('UNLOCKED AND EQUIPPED ${paddle.name.toUpperCase()}!'),
+            backgroundColor: Colors.greenAccent,
           ),
-        ),
-      );
+        );
+      }
     } else {
-      AudioService.playFaultSfx();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          backgroundColor: AppColors.surface,
-          content: Text(
-            'NOT ENOUGH COINS IN YOUR STASH!',
-            style: TextStyle(
-                color: AppColors.redBright, fontWeight: FontWeight.bold),
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('NOT ENOUGH COINS!'),
+            backgroundColor: Colors.redAccent,
           ),
-        ),
-      );
+        );
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final activeInspect = selectedPaddle ?? equippedPaddle;
-    final bool isEquipped = activeInspect.id == equippedPaddle.id;
-
     return Scaffold(
-      backgroundColor: AppColors.void_,
-      extendBodyBehindAppBar: true,
-      appBar: streetAppBar(
-        'BLACK MARKET GEAR',
+      backgroundColor: const Color(0xFF0F1115),
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        title: const Text(
+          'BLACK MARKET GEAR',
+          style: TextStyle(
+            fontWeight: FontWeight.w900,
+            letterSpacing: 1.5,
+            color: Colors.white,
+          ),
+        ),
+        centerTitle: true,
         actions: [
-          Center(
-            child: Padding(
-              padding: const EdgeInsets.only(right: 16.0),
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: AppColors.surface,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppColors.hairline, width: 1.5),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.monetization_on,
-                        color: AppColors.gold, size: 18),
-                    const SizedBox(width: 6),
-                    Text('$userCoins',
-                        style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w900)),
-                  ],
-                ),
-              ),
+          Container(
+            margin: const EdgeInsets.only(right: 16, top: 10, bottom: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1F232C),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Colors.amberAccent, width: 1.5),
             ),
-          )
+            child: Row(
+              children: [
+                const Icon(Icons.monetization_on,
+                    color: Colors.amberAccent, size: 18),
+                const SizedBox(width: 6),
+                Text(
+                  '$_userCoins',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
-      body: StreetBackground(
-        child: SafeArea(
-          child: Padding(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 20.0, vertical: 12.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Inspection Hero Card with Rarity Accent
-                StreetCard(
-                  borderColor: activeInspect.rarity.color,
-                  borderWidth: 1.8,
-                  shadows: [
-                    BoxShadow(
-                      color: activeInspect.rarity.color.withOpacity(0.25),
-                      blurRadius: 20,
-                      spreadRadius: 1,
+      body: _isLoading
+          ? const Center(
+              child: CircularProgressIndicator(color: Colors.amberAccent))
+          : ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: _paddles.length,
+              itemBuilder: (context, index) {
+                final paddle = _paddles[index];
+                final isEquipped = _equippedPaddle?.id == paddle.id;
+
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 16),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1F232C),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: isEquipped
+                          ? Colors.amberAccent
+                          : (paddle.isUnlocked
+                              ? Colors.white12
+                              : Colors.white10),
+                      width: isEquipped ? 2 : 1,
                     ),
-                  ],
+                  ),
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
                         children: [
                           Container(
-                            width: 54,
-                            height: 54,
+                            padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
-                              color: AppColors.surfaceRaised,
-                              borderRadius: BorderRadius.circular(14),
-                              border: Border.all(
-                                  color: activeInspect.rarity.color,
-                                  width: 1.8),
+                              color: paddle.rarity.color.withOpacity(0.15),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: paddle.rarity.color),
                             ),
-                            child: Icon(Icons.sports_tennis_rounded,
-                                color: activeInspect.rarity.color, size: 30),
+                            child: Icon(
+                              Icons.sports_tennis,
+                              color: paddle.rarity.color,
+                              size: 32,
+                            ),
                           ),
-                          const SizedBox(width: 14),
+                          const SizedBox(width: 16),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Row(
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 8, vertical: 2),
-                                      decoration: BoxDecoration(
-                                        color: activeInspect.rarity.color
-                                            .withOpacity(0.18),
-                                        borderRadius: BorderRadius.circular(6),
-                                        border: Border.all(
-                                            color: activeInspect.rarity.color,
-                                            width: 1),
-                                      ),
-                                      child: Text(
-                                        activeInspect.rarity.label,
-                                        style: TextStyle(
-                                          color: activeInspect.rarity.color,
-                                          fontSize: 9.5,
-                                          fontWeight: FontWeight.w900,
-                                          letterSpacing: 0.8,
-                                        ),
-                                      ),
-                                    ),
-                                    if (isEquipped) ...[
-                                      const SizedBox(width: 8),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 8, vertical: 2),
-                                        decoration: BoxDecoration(
-                                          color: AppColors.gold,
-                                          borderRadius:
-                                              BorderRadius.circular(6),
-                                        ),
-                                        child: const Text(
-                                          'EQUIPPED',
-                                          style: TextStyle(
-                                            color: Colors.black,
-                                            fontSize: 9.5,
-                                            fontWeight: FontWeight.w900,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ],
+                                Text(
+                                  paddle.name,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 18,
+                                  ),
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  activeInspect.name,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 17,
-                                    fontWeight: FontWeight.w900,
+                                  paddle.rarity.label,
+                                  style: TextStyle(
+                                    color: paddle.rarity.color,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12,
                                   ),
                                 ),
                               ],
                             ),
                           ),
+                          if (isEquipped)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: Colors.amberAccent,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Text(
+                                'EQUIPPED',
+                                style: TextStyle(
+                                  color: Colors.black,
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ),
                         ],
                       ),
-                      const SizedBox(height: 20),
-
-                      // Animated Stat Comparison Fills
-                      _buildStatRow('POWER', activeInspect.power,
-                          equippedPaddle.power, AppColors.redBright),
-                      const SizedBox(height: 10),
-                      _buildStatRow('CONTROL', activeInspect.control,
-                          equippedPaddle.control, const Color(0xFF38BDF8)),
-                      const SizedBox(height: 10),
-                      _buildStatRow('SPIN', activeInspect.spin,
-                          equippedPaddle.spin, AppColors.gold),
-
-                      const SizedBox(height: 20),
-
-                      // CTA Button
-                      if (activeInspect.isUnlocked)
-                        PrimaryCTA(
-                          label: isEquipped
-                              ? 'CURRENTLY EQUIPPED'
-                              : 'EQUIP PADDLE',
-                          icon: isEquipped
-                              ? Icons.check_circle_rounded
-                              : Icons.flash_on_rounded,
-                          foreground:
-                              isEquipped ? AppColors.textFaint : Colors.black,
-                          gradient: isEquipped
-                              ? AppColors.cardSheen
-                              : AppColors.goldButton,
-                          onPressed: isEquipped
-                              ? () {}
-                              : () => _equipPaddle(activeInspect),
-                          height: 50,
-                        )
-                      else
-                        PrimaryCTA(
-                          label: 'UNLOCK FOR ${activeInspect.price} COINS',
-                          icon: Icons.lock_open_rounded,
-                          gradient: userCoins >= activeInspect.price
-                              ? AppColors.goldButton
-                              : AppColors.redButton,
-                          foreground: Colors.white,
-                          onPressed: () => _buyPaddle(activeInspect),
-                          height: 50,
+                      const SizedBox(height: 16),
+                      _buildStatBar('POWER', paddle.power, Colors.redAccent),
+                      const SizedBox(height: 8),
+                      _buildStatBar(
+                          'CONTROL', paddle.control, Colors.blueAccent),
+                      const SizedBox(height: 8),
+                      _buildStatBar('SPIN', paddle.spin, Colors.purpleAccent),
+                      const SizedBox(height: 16),
+                      if (!isEquipped)
+                        SizedBox(
+                          width: double.infinity,
+                          height: 44,
+                          child: ElevatedButton(
+                            onPressed: paddle.isUnlocked
+                                ? () => _equipPaddle(paddle)
+                                : () => _unlockPaddle(paddle),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: paddle.isUnlocked
+                                  ? Colors.white24
+                                  : Colors.amberAccent,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                            ),
+                            child: Text(
+                              paddle.isUnlocked
+                                  ? 'EQUIP PADDLE'
+                                  : 'UNLOCK FOR ${paddle.price} COINS',
+                              style: TextStyle(
+                                color: paddle.isUnlocked
+                                    ? Colors.white
+                                    : Colors.black,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
                         ),
                     ],
                   ),
-                ),
-
-                const SizedBox(height: 20),
-                const Kicker('AVAILABLE BLACK MARKET INVENTORY'),
-                const SizedBox(height: 10),
-
-                // Inventory Grid / List
-                Expanded(
-                  child: ListView.separated(
-                    itemCount: availablePaddles.length,
-                    separatorBuilder: (context, index) =>
-                        const SizedBox(height: 10),
-                    itemBuilder: (context, index) {
-                      final paddle = availablePaddles[index];
-                      final bool isSelected = paddle.id == activeInspect.id;
-                      final bool isPaddleEquipped =
-                          paddle.id == equippedPaddle.id;
-
-                      return GestureDetector(
-                        onTap: () => setState(() => selectedPaddle = paddle),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 180),
-                          padding: const EdgeInsets.all(14),
-                          decoration: BoxDecoration(
-                            color: isSelected
-                                ? paddle.rarity.color.withOpacity(0.12)
-                                : AppColors.surface,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                              color: isSelected
-                                  ? paddle.rarity.color
-                                  : AppColors.hairline,
-                              width: isSelected ? 1.8 : 1.2,
-                            ),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(
-                                isSelected
-                                    ? Icons.radio_button_checked_rounded
-                                    : Icons.radio_button_off_rounded,
-                                color: isSelected
-                                    ? paddle.rarity.color
-                                    : AppColors.textFaint,
-                                size: 20,
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        Text(
-                                          paddle.name,
-                                          style: TextStyle(
-                                            color: isSelected
-                                                ? paddle.rarity.color
-                                                : Colors.white,
-                                            fontSize: 14.5,
-                                            fontWeight: FontWeight.w900,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      'PWR ${paddle.power}  ·  CTRL ${paddle.control}  ·  SPIN ${paddle.spin}',
-                                      style: const TextStyle(
-                                        color: AppColors.textSecondary,
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              if (isPaddleEquipped)
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 8, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.gold,
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: const Text(
-                                    'EQUIPPED',
-                                    style: TextStyle(
-                                      color: Colors.black,
-                                      fontWeight: FontWeight.w900,
-                                      fontSize: 10,
-                                    ),
-                                  ),
-                                )
-                              else if (!paddle.isUnlocked)
-                                Row(
-                                  children: [
-                                    const Icon(Icons.monetization_on,
-                                        color: AppColors.gold, size: 16),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      '${paddle.price}',
-                                      style: const TextStyle(
-                                        color: AppColors.gold,
-                                        fontWeight: FontWeight.w900,
-                                        fontSize: 13,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ],
+                );
+              },
             ),
-          ),
-        ),
-      ),
     );
   }
 
-  Widget _buildStatRow(
-      String label, int value, int equippedValue, Color color) {
-    final int delta = value - equippedValue;
-    final String deltaStr = delta > 0 ? '+$delta' : '$delta';
-    final Color deltaColor = delta > 0
-        ? AppColors.win
-        : (delta < 0 ? AppColors.redBright : AppColors.textFaint);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildStatBar(String label, int value, Color color) {
+    return Row(
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              label,
-              style: const TextStyle(
-                color: AppColors.textSecondary,
-                fontSize: 11,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 0.8,
-              ),
+        SizedBox(
+          width: 70,
+          child: Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white70,
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
             ),
-            Row(
-              children: [
-                if (delta != 0)
-                  Padding(
-                    padding: const EdgeInsets.only(right: 6.0),
-                    child: Text(
-                      '($deltaStr)',
-                      style: TextStyle(
-                        color: deltaColor,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ),
-                Text(
-                  '$value / 100',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-        const SizedBox(height: 4),
-        Container(
-          width: double.infinity,
-          height: 8,
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(4),
-            border: Border.all(color: AppColors.hairline, width: 1),
           ),
-          child: AnimatedFractionallySizedBox(
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeOutCubic,
-            alignment: Alignment.centerLeft,
-            widthFactor: (value / 100.0).clamp(0.0, 1.0),
-            child: Container(
-              decoration: BoxDecoration(
-                color: color,
-                borderRadius: BorderRadius.circular(4),
-              ),
+        ),
+        Expanded(
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: value / 100.0,
+              backgroundColor: Colors.white10,
+              valueColor: AlwaysStoppedAnimation<Color>(color),
+              minHeight: 8,
             ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        SizedBox(
+          width: 30,
+          child: Text(
+            '$value',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+            ),
+            textAlign: TextAlign.right,
           ),
         ),
       ],

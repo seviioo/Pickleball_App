@@ -1,11 +1,23 @@
 import 'package:flutter/material.dart';
-
+import 'package:flutter/services.dart';
 import 'screens/welcome_screen.dart';
 import 'services/audio_service.dart';
+import 'theme/app_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Enable full dual-orientation support (Portrait & Landscape)
+  await SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+    DeviceOrientation.portraitDown,
+    DeviceOrientation.landscapeLeft,
+    DeviceOrientation.landscapeRight,
+  ]);
+
+  // Preload audio assets and sound effects
   await AudioService.init();
+
   runApp(const PickleballApp());
 }
 
@@ -15,16 +27,9 @@ class PickleballApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Picklyball App',
+      title: 'Pickleball Street Blitz',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData.dark().copyWith(
-        scaffoldBackgroundColor: const Color(0xFF050506),
-        textSelectionTheme: const TextSelectionThemeData(
-          cursorColor: Color(0xFFFACC15),
-          selectionColor: Color(0x55FACC15),
-          selectionHandleColor: Color(0xFFFACC15),
-        ),
-      ),
+      theme: AppTheme.darkTheme,
       home: const WelcomeScreen(),
     );
   }
