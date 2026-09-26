@@ -1,7 +1,7 @@
 import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 import '../game/pickleball_game.dart';
-import '../models/game_models.dart';
+import '../models/game_models.dart' hide CharacterAnimState, OrbType;
 import '../painters/perspective_court_painter.dart';
 import 'lobby_screen.dart';
 import 'match_summary_screen.dart';
@@ -53,15 +53,14 @@ class _CourtGameplayScreenState extends State<CourtGameplayScreen> {
   bool isDoublePointsActive = false;
   bool isAiShrunk = false;
   String? timingFeedback;
+  double? aimTargetX;
+  double? aimTargetY;
+  bool isAiming = false;
+  String selectedShotType = 'DRIVE';
   CharacterAnimState playerAnimState = CharacterAnimState.idle;
   CharacterAnimState aiAnimState = CharacterAnimState.idle;
   int playerFrame = 0;
   int aiFrame = 0;
-
-  // Tracked Stats
-  int smashesLanded = 0;
-  int longestRally = 0;
-  int kitchenFaults = 0;
 
   @override
   void initState() {
@@ -101,9 +100,9 @@ class _CourtGameplayScreenState extends State<CourtGameplayScreen> {
         required CharacterAnimState aiAnimState,
         required int playerFrame,
         required int aiFrame,
-        required int smashesLanded,
-        required int longestRally,
-        required int kitchenFaults,
+        double? aimTargetX,
+        double? aimTargetY,
+        required bool isAiming,
       }) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) {
@@ -132,9 +131,9 @@ class _CourtGameplayScreenState extends State<CourtGameplayScreen> {
               this.aiAnimState = aiAnimState;
               this.playerFrame = playerFrame;
               this.aiFrame = aiFrame;
-              this.smashesLanded = smashesLanded;
-              this.longestRally = longestRally;
-              this.kitchenFaults = kitchenFaults;
+              this.aimTargetX = aimTargetX;
+              this.aimTargetY = aimTargetY;
+              this.isAiming = isAiming;
             });
             if (isGameOver && !_hasShownGameOverModal) {
               _hasShownGameOverModal = true;
@@ -332,9 +331,6 @@ class _CourtGameplayScreenState extends State<CourtGameplayScreen> {
           isVictory: playerScore > opponentScore,
           isTournamentMatch: widget.isTournamentMatch,
           tournamentRound: widget.tournamentRound,
-          smashesLanded: smashesLanded,
-          longestRally: longestRally,
-          kitchenFaults: kitchenFaults,
         ),
       ),
     );
@@ -349,199 +345,211 @@ class _CourtGameplayScreenState extends State<CourtGameplayScreen> {
           builder: (context, orientation) {
             final bool isLandscape = orientation == Orientation.landscape;
 
-            return Stack(
-              children: [
-                Positioned.fill(
-                  child: CustomPaint(
-                    painter: PerspectiveCourtPainter(
-                      ballX: ballX,
-                      ballY: ballY,
-                      ballHeight: ballHeight,
-                      playerX: playerX,
-                      playerY: playerY,
-                      opponentX: opponentX,
-                      opponentY: opponentY,
-                      orbX: orbX,
-                      orbY: orbY,
-                      orbType: orbType,
-                      isDoublePointsActive: isDoublePointsActive,
-                      isAiShrunk: isAiShrunk,
-                      timingFeedback: timingFeedback,
-                      playerColor: widget.characterStyle.outfitPrimary,
-                      isUltimateActive: isUltimateActive,
-                      playerAnimState: playerAnimState,
-                      aiAnimState: aiAnimState,
-                      playerFrame: playerFrame,
-                      aiFrame: aiFrame,
-                    ),
-                  ),
-                ),
-                Positioned.fill(
-                  child: Opacity(
-                    opacity: 0.01,
-                    child: GameWidget(game: game),
-                  ),
-                ),
-                Positioned(
-                  top: isLandscape ? 6 : 12,
-                  left: 12,
-                  right: 12,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Row(
-                        children: [
-                          _buildHeaderIconButton(Icons.pause, _openPauseMenu),
-                          const SizedBox(width: 8),
-                          _buildHeaderIconButton(Icons.home, _openPauseMenu),
-                        ],
-                      ),
-                      Container(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: isLandscape ? 12 : 16,
-                          vertical: isLandscape ? 4 : 8,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF18181B),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                              color: const Color(0xFFFACC15), width: 2),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.radio,
-                                color: Color(0xFFFACC15), size: 18),
-                            const SizedBox(width: 6),
-                            Text(
-                              '$playerScore - $opponentScore',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: isLandscape ? 16 : 20,
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      if (isDoublePointsActive)
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                              color: const Color(0xFFEAB308),
-                              borderRadius: BorderRadius.circular(8)),
-                          child: const Text('2X POINTS',
-                              style: TextStyle(
-                                  color: Colors.black,
-                                  fontWeight: FontWeight.w900,
-                                  fontSize: 10)),
-                        )
-                      else
-                        const SizedBox(width: 40),
-                    ],
-                  ),
-                ),
-                Positioned(
-                  top: isLandscape ? 46 : 68,
-                  left: 0,
-                  right: 0,
-                  child: Center(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.85),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.white24),
-                      ),
-                      child: Text(
-                        matchStatus,
-                        style: const TextStyle(
-                            color: Color(0xFFFACC15),
-                            fontSize: 11,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 1.0),
+            return GestureDetector(
+              onPanStart: (details) {
+                final RenderBox? box = context.findRenderObject() as RenderBox?;
+                if (box != null) {
+                  final localPos = box.globalToLocal(details.globalPosition);
+                  final normX = ((localPos.dx / box.size.width) - 0.5) * 2.0;
+                  final normY = ((localPos.dy / box.size.height) - 0.5) * 2.0;
+                  game.updateAim(Offset(normX, normY));
+                }
+              },
+              onPanUpdate: (details) {
+                final RenderBox? box = context.findRenderObject() as RenderBox?;
+                if (box != null) {
+                  final localPos = box.globalToLocal(details.globalPosition);
+                  final normX = ((localPos.dx / box.size.width) - 0.5) * 2.0;
+                  final normY = ((localPos.dy / box.size.height) - 0.5) * 2.0;
+                  game.updateAim(Offset(normX, normY));
+                }
+              },
+              onPanEnd: (details) {
+                game.triggerDragAttack(Offset.zero, selectedShotType);
+              },
+              onPanCancel: () {
+                game.cancelAim();
+              },
+              child: Stack(
+                children: [
+                  Positioned.fill(
+                    child: CustomPaint(
+                      painter: PerspectiveCourtPainter(
+                        ballX: ballX,
+                        ballY: ballY,
+                        ballHeight: ballHeight,
+                        playerX: playerX,
+                        playerY: playerY,
+                        opponentX: opponentX,
+                        opponentY: opponentY,
+                        orbX: orbX,
+                        orbY: orbY,
+                        orbType: orbType,
+                        isDoublePointsActive: isDoublePointsActive,
+                        isAiShrunk: isAiShrunk,
+                        timingFeedback: timingFeedback,
+                        playerColor: widget.characterStyle.outfitPrimary,
+                        isUltimateActive: isUltimateActive,
+                        playerAnimState: playerAnimState,
+                        aiAnimState: aiAnimState,
+                        playerFrame: playerFrame,
+                        aiFrame: aiFrame,
                       ),
                     ),
                   ),
-                ),
-                if (!isGameOver) ...[
-                  Positioned(
-                    left: isLandscape ? 16 : 24,
-                    bottom: isLandscape ? 12 : 24,
-                    child: TouchJoystickWheel(
-                      onJoystickMoved: (Offset direction) {
-                        game.updatePlayerMovement(direction);
-                      },
+                  Positioned.fill(
+                    child: Opacity(
+                      opacity: 0.01,
+                      child: GameWidget(game: game),
                     ),
                   ),
                   Positioned(
-                    right: isLandscape ? 16 : 20,
-                    bottom: isLandscape ? 10 : 20,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.end,
+                    top: isLandscape ? 6 : 12,
+                    left: 12,
+                    right: 12,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        if (isPlayerServing)
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 8),
-                            child: SizedBox(
-                              width: isLandscape ? 110 : 130,
-                              height: isLandscape ? 40 : 48,
-                              child: ElevatedButton.icon(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFFFACC15),
-                                  foregroundColor: Colors.black,
-                                  shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12)),
-                                ),
-                                onPressed: () => game.triggerAttack('SERVE'),
-                                icon: const Icon(Icons.sports_tennis, size: 18),
-                                label: const Text('SERVE',
-                                    style:
-                                        TextStyle(fontWeight: FontWeight.w900)),
-                              ),
-                            ),
+                        Row(
+                          children: [
+                            _buildHeaderIconButton(Icons.pause, _openPauseMenu),
+                            const SizedBox(width: 8),
+                            _buildHeaderIconButton(Icons.home, _openPauseMenu),
+                          ],
+                        ),
+                        Container(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: isLandscape ? 12 : 16,
+                            vertical: isLandscape ? 4 : 8,
                           ),
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            _buildStreetButton(
-                              label: 'SLICE',
-                              onPressed: () => game.triggerAttack('ROLL'),
-                              isLandscape: isLandscape,
-                            ),
-                            SizedBox(width: isLandscape ? 8 : 12),
-                            _buildStreetButton(
-                              label: 'DRIVE',
-                              onPressed: () => game.triggerAttack('DRIVE'),
-                              isPrimary: true,
-                              isLandscape: isLandscape,
-                            ),
-                          ],
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF18181B),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                                color: const Color(0xFFFACC15), width: 2),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.radio,
+                                  color: Color(0xFFFACC15), size: 18),
+                              const SizedBox(width: 6),
+                              Text(
+                                '$playerScore - $opponentScore',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: isLandscape ? 16 : 20,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                        SizedBox(height: isLandscape ? 6 : 8),
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            _buildStreetButton(
-                              label: 'LOB',
-                              onPressed: () => game.triggerAttack('LOB'),
-                              isLandscape: isLandscape,
-                            ),
-                            SizedBox(width: isLandscape ? 8 : 12),
-                            _buildStreetButton(
-                              label: 'SMASH',
-                              onPressed: () => game.triggerAttack('SMASH'),
-                              isLandscape: isLandscape,
-                            ),
-                          ],
-                        ),
+                        if (isDoublePointsActive)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                                color: const Color(0xFFEAB308),
+                                borderRadius: BorderRadius.circular(8)),
+                            child: const Text('2X POINTS',
+                                style: TextStyle(
+                                    color: Colors.black,
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 10)),
+                          )
+                        else
+                          const SizedBox(width: 40),
                       ],
                     ),
                   ),
+                  Positioned(
+                    top: isLandscape ? 44 : 68,
+                    left: 0,
+                    right: 0,
+                    child: Center(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.85),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.white24),
+                        ),
+                        child: Text(
+                          matchStatus,
+                          style: const TextStyle(
+                              color: Color(0xFFFACC15),
+                              fontSize: 11,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 1.0),
+                        ),
+                      ),
+                    ),
+                  ),
+                  if (!isGameOver) ...[
+                    Positioned(
+                      left: isLandscape ? 16 : 24,
+                      bottom: isLandscape ? 12 : 24,
+                      child: TouchJoystickWheel(
+                        onJoystickMoved: (Offset direction) {
+                          game.updatePlayerMovement(direction);
+                        },
+                      ),
+                    ),
+                    Positioned(
+                      right: isLandscape ? 16 : 20,
+                      bottom: isLandscape ? 10 : 20,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              _buildStreetButton(
+                                label: 'SLICE',
+                                onPressed: () =>
+                                    setState(() => selectedShotType = 'SLICE'),
+                                isPrimary: selectedShotType == 'SLICE',
+                                isLandscape: isLandscape,
+                              ),
+                              SizedBox(width: isLandscape ? 8 : 12),
+                              _buildStreetButton(
+                                label: 'DRIVE',
+                                onPressed: () =>
+                                    setState(() => selectedShotType = 'DRIVE'),
+                                isPrimary: selectedShotType == 'DRIVE',
+                                isLandscape: isLandscape,
+                              ),
+                            ],
+                          ),
+                          SizedBox(height: isLandscape ? 6 : 8),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              _buildStreetButton(
+                                label: 'LOB',
+                                onPressed: () =>
+                                    setState(() => selectedShotType = 'LOB'),
+                                isPrimary: selectedShotType == 'LOB',
+                                isLandscape: isLandscape,
+                              ),
+                              SizedBox(width: isLandscape ? 8 : 12),
+                              _buildStreetButton(
+                                label: 'SMASH',
+                                onPressed: () =>
+                                    setState(() => selectedShotType = 'SMASH'),
+                                isPrimary: selectedShotType == 'SMASH',
+                                isLandscape: isLandscape,
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ],
-              ],
+              ),
             );
           },
         ),

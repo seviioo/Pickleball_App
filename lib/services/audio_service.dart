@@ -29,11 +29,16 @@ class AudioService {
     _hapticsEnabled = haptics;
   }
 
+  // Alias for groupmate's engine methods
+  static void playShotSfx(String type) => playHitSound(type);
+  static void playFaultSfx() => playHitSound('FAULT');
+
   static void playHitSound(String type) {
     if (!_soundEnabled) return;
     try {
       switch (type.toUpperCase()) {
         case 'SMASH':
+        case 'ULTIMATE':
           FlameAudio.play('hit_smash.mp3');
           if (_hapticsEnabled) HapticFeedback.mediumImpact();
           break;
@@ -41,9 +46,9 @@ class AudioService {
           FlameAudio.play('fault.mp3');
           if (_hapticsEnabled) HapticFeedback.heavyImpact();
           break;
-        case 'SPEEDUP':
         case 'ROLL':
         case 'SLICE':
+        case 'SPEEDUP':
           FlameAudio.play('hit_speedup.mp3');
           if (_hapticsEnabled) HapticFeedback.lightImpact();
           break;
