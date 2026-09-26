@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../game/pickleball_game.dart';
-import 'dart:math';
 
 class PerspectiveCourtPainter extends CustomPainter {
   final double ballX;
