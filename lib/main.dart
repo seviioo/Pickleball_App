@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'screens/welcome_screen.dart';
+import 'screens/login_screen.dart';
 import 'services/audio_service.dart';
 import 'theme/app_theme.dart';
 
@@ -30,7 +30,7 @@ class PickleballApp extends StatelessWidget {
       title: 'Pickleball Street Blitz',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.darkTheme,
-      home: const WelcomeScreen(),
+      home: const LoginScreen(),
     );
   }
 }

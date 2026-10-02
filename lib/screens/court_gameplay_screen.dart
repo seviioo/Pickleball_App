@@ -32,35 +32,35 @@ class CourtGameplayScreen extends StatefulWidget {
 
 class _CourtGameplayScreenState extends State<CourtGameplayScreen> {
   late PickleballGame game;
+
   int playerScore = 0;
   int opponentScore = 0;
   bool isPlayerServing = true;
   String matchStatus = 'STREET SERVE READY';
   bool isGameOver = false;
   bool _hasShownGameOverModal = false;
+
   double ultimateGauge = 0.0;
   bool isUltimateActive = false;
 
   double ballX = 0.0;
   double ballY = 0.85;
   double ballHeight = 0.4;
+
   double playerX = 0.0;
   double playerY = 0.85;
+
   double opponentX = 0.0;
   double opponentY = -0.85;
 
   double? orbX;
   double? orbY;
   OrbType? orbType;
+
   bool isDoublePointsActive = false;
   bool isAiShrunk = false;
+
   String? timingFeedback;
-
-  double? aimTargetX;
-  double? aimTargetY;
-  bool isAiming = false;
-
-  String selectedShotType = 'DRIVE';
 
   CharacterAnimState playerAnimState = CharacterAnimState.idle;
   CharacterAnimState aiAnimState = CharacterAnimState.idle;
@@ -105,9 +105,6 @@ class _CourtGameplayScreenState extends State<CourtGameplayScreen> {
         required CharacterAnimState aiAnimState,
         required int playerFrame,
         required int aiFrame,
-        double? aimTargetX,
-        double? aimTargetY,
-        required bool isAiming,
       }) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) {
@@ -136,9 +133,6 @@ class _CourtGameplayScreenState extends State<CourtGameplayScreen> {
               this.aiAnimState = aiAnimState;
               this.playerFrame = playerFrame;
               this.aiFrame = aiFrame;
-              this.aimTargetX = aimTargetX;
-              this.aimTargetY = aimTargetY;
-              this.isAiming = isAiming;
             });
 
             if (isGameOver && !_hasShownGameOverModal) {
@@ -334,6 +328,9 @@ class _CourtGameplayScreenState extends State<CourtGameplayScreen> {
           playerScore: playerScore,
           opponentScore: opponentScore,
           aiDupr: widget.aiDupr,
+          smashesLanded: game.smashesLanded,
+          longestRally: game.longestRally,
+          kitchenFaults: game.kitchenFaults,
         ),
       ),
     );
@@ -368,9 +365,29 @@ class _CourtGameplayScreenState extends State<CourtGameplayScreen> {
                   aiAnimState: aiAnimState,
                   playerFrame: playerFrame,
                   aiFrame: aiFrame,
-                  aimTargetX: aimTargetX,
-                  aimTargetY: aimTargetY,
-                  isAiming: isAiming,
+                  ballVx: game.ballVx,
+                  ballVy: game.ballVy,
+                  ballVz: game.ballVz,
+                  ballRotation: game.ballRotation,
+                  ballImpact: game.ballImpactTimer,
+                  trail: List.of(game.trail),
+                  animClock: game.animClock,
+                  playerWalkPhase: game.playerWalkPhase,
+                  aiWalkPhase: game.aiWalkPhase,
+                  playerMoveAmount:
+                      game.playerInputDir.distance.clamp(0.0, 1.0).toDouble(),
+                  playerMoveX:
+                      game.playerInputDir.dx.clamp(-1.0, 1.0).toDouble(),
+                  aiMoveAmount: game.aiMoveAmount,
+                  aiMoveX: (game.aiVelX / 0.9).clamp(-1.0, 1.0).toDouble(),
+                  playerActionProgress: game.playerAnimProgress,
+                  aiActionProgress: game.aiAnimProgress,
+                  playerReach: game.playerReach,
+                  ballInReach: game.ballInPlayerReach,
+                  aimX: game.playerAimPreview.dx,
+                  aimY: game.playerAimPreview.dy,
+                  aimScatter: game.playerAimScatter,
+                  showAim: game.showAimPreview,
                 ),
               ),
             ),
@@ -380,8 +397,7 @@ class _CourtGameplayScreenState extends State<CourtGameplayScreen> {
                 child: GameWidget(game: game),
               ),
             ),
-
-            // Top Header Bar
+            // Header Bar
             Positioned(
               top: 12,
               left: 12,
@@ -427,7 +443,7 @@ class _CourtGameplayScreenState extends State<CourtGameplayScreen> {
                       decoration: BoxDecoration(
                           color: const Color(0xFFEAB308),
                           borderRadius: BorderRadius.circular(8)),
-                      child: const Text('2X POINTS ACTIVE',
+                      child: const Text('  2X POINTS ACTIVE',
                           style: TextStyle(
                               color: Colors.black,
                               fontWeight: FontWeight.w900,
@@ -438,8 +454,7 @@ class _CourtGameplayScreenState extends State<CourtGameplayScreen> {
                 ],
               ),
             ),
-
-            // Match Status Banner
+            // Status Banner
             Positioned(
               top: 68,
               left: 0,
@@ -449,7 +464,7 @@ class _CourtGameplayScreenState extends State<CourtGameplayScreen> {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                   decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.85),
+                    color: Colors.black.withOpacity(0.85),
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(color: Colors.white24),
                   ),
@@ -464,9 +479,7 @@ class _CourtGameplayScreenState extends State<CourtGameplayScreen> {
                 ),
               ),
             ),
-
             if (!isGameOver) ...[
-              // Left Joystick (Movement)
               Positioned(
                 left: 24,
                 bottom: 24,
@@ -476,8 +489,6 @@ class _CourtGameplayScreenState extends State<CourtGameplayScreen> {
                   },
                 ),
               ),
-
-              // Right Drag-and-Release Aiming Pad
               Positioned(
                 right: 20,
                 bottom: 20,
@@ -485,33 +496,51 @@ class _CourtGameplayScreenState extends State<CourtGameplayScreen> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    // Shot Type Toggle Row
+                    if (isPlayerServing)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: SizedBox(
+                          width: 130,
+                          height: 48,
+                          child: ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFFFACC15),
+                              foregroundColor: Colors.black,
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12)),
+                            ),
+                            onPressed: () => game.triggerAttack('SERVE'),
+                            icon: const Icon(Icons.sports_tennis, size: 20),
+                            label: const Text('SERVE',
+                                style: TextStyle(fontWeight: FontWeight.w900)),
+                          ),
+                        ),
+                      ),
                     Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        _buildShotTypeChip('DRIVE'),
-                        const SizedBox(width: 6),
-                        _buildShotTypeChip('SLICE'),
-                        const SizedBox(width: 6),
-                        _buildShotTypeChip('SMASH'),
-                        const SizedBox(width: 6),
-                        _buildShotTypeChip('LOB'),
+                        _buildStreetButton(
+                            label: 'SLICE',
+                            onPressed: () => game.triggerAttack('ROLL')),
+                        const SizedBox(width: 12),
+                        _buildStreetButton(
+                            label: 'DRIVE',
+                            onPressed: () => game.triggerAttack('DRIVE'),
+                            isPrimary: true),
                       ],
                     ),
-                    const SizedBox(height: 10),
-                    // Drag Attack Pad
-                    DragAttackJoystick(
-                      selectedShotType: selectedShotType,
-                      onAimUpdated: (Offset aimNormalized) {
-                        game.updateAim(aimNormalized);
-                      },
-                      onReleaseAttack: (Offset releaseNormalized) {
-                        game.triggerDragAttack(
-                            releaseNormalized, selectedShotType);
-                      },
-                      onCancelAim: () {
-                        game.cancelAim();
-                      },
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _buildStreetButton(
+                            label: 'LOB',
+                            onPressed: () => game.triggerAttack('LOB')),
+                        const SizedBox(width: 12),
+                        _buildStreetButton(
+                            label: 'SMASH',
+                            onPressed: () => game.triggerAttack('SMASH')),
+                      ],
                     ),
                   ],
                 ),
@@ -523,35 +552,12 @@ class _CourtGameplayScreenState extends State<CourtGameplayScreen> {
     );
   }
 
-  Widget _buildShotTypeChip(String type) {
-    final bool isSelected = selectedShotType == type;
-    return GestureDetector(
-      onTap: () => setState(() => selectedShotType = type),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFFFACC15) : const Color(0xFF27272A),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: isSelected ? Colors.white : Colors.white24),
-        ),
-        child: Text(
-          type,
-          style: TextStyle(
-            color: isSelected ? Colors.black : Colors.white,
-            fontSize: 10,
-            fontWeight: FontWeight.w900,
-          ),
-        ),
-      ),
-    );
-  }
-
   Widget _buildHeaderIconButton(IconData icon, VoidCallback onPressed) {
     return Container(
       width: 40,
       height: 40,
       decoration: BoxDecoration(
-        color: const Color(0xFF18181B).withValues(alpha: 0.8),
+        color: const Color(0xFF18181B).withOpacity(0.8),
         shape: BoxShape.circle,
         border: Border.all(color: const Color(0xFFFACC15), width: 1.5),
       ),
@@ -559,6 +565,33 @@ class _CourtGameplayScreenState extends State<CourtGameplayScreen> {
         padding: EdgeInsets.zero,
         icon: Icon(icon, color: Colors.white, size: 20),
         onPressed: onPressed,
+      ),
+    );
+  }
+
+  Widget _buildStreetButton(
+      {required String label,
+      required VoidCallback onPressed,
+      bool isPrimary = false}) {
+    return GestureDetector(
+      onTap: onPressed,
+      child: Container(
+        width: isPrimary ? 72 : 64,
+        height: isPrimary ? 72 : 64,
+        decoration: BoxDecoration(
+          color: isPrimary ? const Color(0xFFDC2626) : const Color(0xFF27272A),
+          shape: BoxShape.circle,
+          border: Border.all(
+              color: isPrimary ? const Color(0xFFFACC15) : Colors.white38,
+              width: 2.5),
+        ),
+        child: Center(
+          child: Text(
+            label,
+            style: const TextStyle(
+                color: Colors.white, fontWeight: FontWeight.w900, fontSize: 11),
+          ),
+        ),
       ),
     );
   }
@@ -580,6 +613,7 @@ class _TouchJoystickWheelState extends State<TouchJoystickWheel> {
   void _updatePosition(Offset offset) {
     final double distance = offset.distance;
     final double maxDistance = _baseRadius - _knobRadius;
+
     Offset clampedOffset = offset;
     if (distance > maxDistance) {
       clampedOffset = Offset(
@@ -587,6 +621,7 @@ class _TouchJoystickWheelState extends State<TouchJoystickWheel> {
         (offset.dy / distance) * maxDistance,
       );
     }
+
     setState(() {
       _dragPosition = clampedOffset;
     });
@@ -619,7 +654,7 @@ class _TouchJoystickWheelState extends State<TouchJoystickWheel> {
         height: _baseRadius * 2,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: const Color(0xFF18181B).withValues(alpha: 0.80),
+          color: const Color(0xFF18181B).withOpacity(0.80),
           border: Border.all(color: const Color(0xFFFACC15), width: 2.5),
         ),
         child: Stack(
@@ -636,123 +671,6 @@ class _TouchJoystickWheelState extends State<TouchJoystickWheel> {
                 ),
                 child:
                     const Icon(Icons.navigation, size: 16, color: Colors.black),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Attack Drag-and-Release Aim Pad Component
-class DragAttackJoystick extends StatefulWidget {
-  final String selectedShotType;
-  final Function(Offset aimNormalized) onAimUpdated;
-  final Function(Offset releaseNormalized) onReleaseAttack;
-  final VoidCallback onCancelAim;
-
-  const DragAttackJoystick({
-    super.key,
-    required this.selectedShotType,
-    required this.onAimUpdated,
-    required this.onReleaseAttack,
-    required this.onCancelAim,
-  });
-
-  @override
-  State<DragAttackJoystick> createState() => _DragAttackJoystickState();
-}
-
-class _DragAttackJoystickState extends State<DragAttackJoystick> {
-  Offset _dragPosition = Offset.zero;
-  final double _baseRadius = 60.0;
-  final double _knobRadius = 24.0;
-
-  void _updatePosition(Offset offset) {
-    final double distance = offset.distance;
-    final double maxDistance = _baseRadius - _knobRadius;
-    Offset clampedOffset = offset;
-    if (distance > maxDistance) {
-      clampedOffset = Offset(
-        (offset.dx / distance) * maxDistance,
-        (offset.dy / distance) * maxDistance,
-      );
-    }
-    setState(() {
-      _dragPosition = clampedOffset;
-    });
-
-    final normalized = Offset(
-      clampedOffset.dx / maxDistance,
-      clampedOffset.dy / maxDistance,
-    );
-    widget.onAimUpdated(normalized);
-  }
-
-  void _onRelease() {
-    final double maxDistance = _baseRadius - _knobRadius;
-    final normalized = Offset(
-      _dragPosition.dx / maxDistance,
-      _dragPosition.dy / maxDistance,
-    );
-    widget.onReleaseAttack(normalized);
-    setState(() {
-      _dragPosition = Offset.zero;
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onPanStart: (details) => _updatePosition(
-          details.localPosition - Offset(_baseRadius, _baseRadius)),
-      onPanUpdate: (details) => _updatePosition(
-          details.localPosition - Offset(_baseRadius, _baseRadius)),
-      onPanEnd: (_) => _onRelease(),
-      onPanCancel: () {
-        setState(() => _dragPosition = Offset.zero);
-        widget.onCancelAim();
-      },
-      child: Container(
-        width: _baseRadius * 2,
-        height: _baseRadius * 2,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: const Color(0xFFDC2626).withValues(alpha: 0.85),
-          border: Border.all(color: const Color(0xFFFACC15), width: 3.0),
-          boxShadow: [
-            BoxShadow(
-                color: const Color(0xFFDC2626).withValues(alpha: 0.35),
-                blurRadius: 16),
-          ],
-        ),
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            const Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.gps_fixed, color: Colors.white70, size: 22),
-                SizedBox(height: 2),
-                Text('DRAG AIM',
-                    style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 8.5,
-                        fontWeight: FontWeight.w900)),
-              ],
-            ),
-            Transform.translate(
-              offset: _dragPosition,
-              child: Container(
-                width: _knobRadius * 2,
-                height: _knobRadius * 2,
-                decoration: const BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Color(0xFFFACC15),
-                ),
-                child: const Icon(Icons.sports_tennis,
-                    size: 16, color: Colors.black),
               ),
             ),
           ],

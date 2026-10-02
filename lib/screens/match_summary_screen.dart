@@ -59,6 +59,7 @@ class _MatchSummaryScreenState extends State<MatchSummaryScreen>
       parent: _counterController,
       curve: Curves.easeOutCubic,
     );
+
     _counterController.forward().then((_) {
       if (widget.leveledUp && mounted) {
         _showLevelUpOverlay();
@@ -164,6 +165,7 @@ class _MatchSummaryScreenState extends State<MatchSummaryScreen>
   Widget build(BuildContext context) {
     final bool isWin =
         widget.playerScore >= widget.opponentScore && widget.isVictory;
+
     return Scaffold(
       backgroundColor: const Color(0xFF0F1115),
       body: SafeArea(
@@ -173,6 +175,7 @@ class _MatchSummaryScreenState extends State<MatchSummaryScreen>
             final double progress = _counterAnimation.value;
             final int displayCoins = (widget.coinsEarned * progress).round();
             final int displayXp = (widget.xpEarned * progress).round();
+
             return Padding(
               padding:
                   const EdgeInsets.symmetric(horizontal: 20.0, vertical: 16.0),
@@ -201,6 +204,7 @@ class _MatchSummaryScreenState extends State<MatchSummaryScreen>
     final Color headerColor = isWin ? Colors.amberAccent : Colors.redAccent;
     final String titleText = isWin ? 'VICTORY!' : 'DEFEATED';
     final IconData headerIcon = isWin ? Icons.emoji_events : Icons.heart_broken;
+
     return Column(
       children: [
         Icon(headerIcon, color: headerColor, size: 56),
@@ -423,7 +427,6 @@ class _MatchSummaryScreenState extends State<MatchSummaryScreen>
             if (widget.isTournamentMatch) {
               final nextRound = widget.tournamentRound + 1;
               await StorageService.setTournamentRound(nextRound);
-
               if (widget.tournamentRound == 2) {
                 coinsToAward += 1500;
                 xpToAward += 500;

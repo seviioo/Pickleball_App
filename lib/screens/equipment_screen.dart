@@ -47,6 +47,7 @@ class _EquipmentScreenState extends State<EquipmentScreen> {
       await StorageService.unlockPaddle(paddle.id);
       await StorageService.setEquippedPaddle(paddle);
       await _loadData();
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -142,16 +143,23 @@ class _EquipmentScreenState extends State<EquipmentScreen> {
                       Row(
                         children: [
                           Container(
-                            padding: const EdgeInsets.all(12),
+                            padding: const EdgeInsets.all(8),
                             decoration: BoxDecoration(
                               color: paddle.rarity.color.withOpacity(0.15),
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(color: paddle.rarity.color),
                             ),
-                            child: Icon(
-                              Icons.sports_tennis,
-                              color: paddle.rarity.color,
-                              size: 32,
+                            child: Image.asset(
+                              paddle.imagePath,
+                              width: 48,
+                              height: 48,
+                              fit: BoxFit.contain,
+                              errorBuilder: (context, error, stackTrace) =>
+                                  Icon(
+                                Icons.sports_tennis,
+                                color: paddle.rarity.color,
+                                size: 32,
+                              ),
                             ),
                           ),
                           const SizedBox(width: 16),

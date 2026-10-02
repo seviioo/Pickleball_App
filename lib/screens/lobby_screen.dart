@@ -107,7 +107,10 @@ class _LobbyScreenState extends State<LobbyScreen> {
                       await Navigator.push(
                         context,
                         MaterialPageRoute(
-                            builder: (context) => const SettingsScreen()),
+                          builder: (context) => SettingsScreen(
+                            currentUserName: widget.userName,
+                          ),
+                        ),
                       );
                       _loadUserData();
                     },
@@ -251,11 +254,17 @@ class _LobbyScreenState extends State<LobbyScreen> {
                 subtitle: 'Master dinks, drives, and kitchen rules',
                 icon: Icons.school,
                 color: Colors.cyanAccent,
-                onTap: () {
+                onTap: () async {
+                  final paddle = await StorageService.getEquippedPaddle();
+                  if (!mounted) return;
+
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => const PracticeTutorialScreen(),
+                      builder: (context) => PracticeTutorialScreen(
+                        userName: widget.userName,
+                        paddle: paddle,
+                      ),
                     ),
                   );
                 },
