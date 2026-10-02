@@ -20,6 +20,7 @@ enum CharacterAnimState {
 }
 
 enum OrbType {
+  speedDemon,
   doublePoints,
   shrinkOpponent,
   shrinkRay,
