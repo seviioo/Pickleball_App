@@ -43,6 +43,10 @@ class _MultiplayerCourtScreenState extends State<MultiplayerCourtScreen> {
   int opponentScore = 0;
   bool isGameOver = false;
   String matchStatus = 'STREET SERVE READY';
+  bool isPlayerServing = true;
+  String playerAnimState = 'idle';
+  String opponentAnimState = 'idle';
+  bool _matchResultSubmitted = false;
 
   StreamSubscription? _socketSub;
 
@@ -57,28 +61,52 @@ class _MultiplayerCourtScreenState extends State<MultiplayerCourtScreen> {
       if (!mounted) return;
       final type = event['type'];
 
-      if (type == 'MOVE') {
+      if (type == 'STATE') {
         setState(() {
-          opponentX = event['x'];
-          opponentY = event['y'];
+          myScore = _number(event['myScore']).round();
+          opponentScore = _number(event['opponentScore']).round();
+          isPlayerServing = event['isServing'] == true;
+          isGameOver = event['isGameOver'] == true;
+          matchStatus = '${event['status'] ?? 'RALLY'}';
+          ballX = _number(event['ballX']);
+          ballY = _number(event['ballY']);
+          ballHeight = _number(event['ballHeight']);
+          myX = _number(event['myX']);
+          myY = _number(event['myY']);
+          opponentX = _number(event['opponentX']);
+          opponentY = _number(event['opponentY']);
+          playerAnimState = '${event['playerAnimState'] ?? 'idle'}';
+          opponentAnimState = '${event['opponentAnimState'] ?? 'idle'}';
         });
-      } else if (type == 'BALL') {
-        setState(() {
-          ballX = event['x'];
-          ballY = event['y'];
-          ballHeight = event['h'];
-        });
-      } else if (type == 'SCORE') {
-        setState(() {
-          myScore = widget.isHost ? event['hostScore'] : event['guestScore'];
-          opponentScore =
-              widget.isHost ? event['guestScore'] : event['hostScore'];
-          matchStatus = 'POINT OUT';
-        });
-      } else if (type == 'MATCH_END') {
-        _handleMatchEnd(event['winner'] == widget.userName);
+        if (isGameOver && !_matchResultSubmitted) {
+          _handleMatchEnd(myScore > opponentScore);
+        }
       }
     });
+  }
+
+  double _number(dynamic value) {
+    if (value is num) return value.toDouble();
+    return double.tryParse('$value') ?? 0;
+  }
+
+  game.CharacterAnimState _animationFor(String value) {
+    switch (value) {
+      case 'walking':
+        return game.CharacterAnimState.walkingUp;
+      case 'drive':
+        return game.CharacterAnimState.drive;
+      case 'slice':
+        return game.CharacterAnimState.slice;
+      case 'lob':
+        return game.CharacterAnimState.lob;
+      case 'smash':
+        return game.CharacterAnimState.smash;
+      case 'serving':
+        return game.CharacterAnimState.serving;
+      default:
+        return game.CharacterAnimState.idle;
+    }
   }
 
   void _onJoystickMove(Offset direction) {
@@ -88,15 +116,14 @@ class _MultiplayerCourtScreenState extends State<MultiplayerCourtScreen> {
     });
 
     SocketService.instance.sendEvent('MOVE', {
-      'roomCode': widget.roomCode,
-      'x': -myX,
-      'y': -myY,
+      'dx': direction.dx,
+      'dy': direction.dy,
     });
   }
 
   void _triggerShot(String type) {
+    if (isGameOver) return;
     SocketService.instance.sendEvent('SHOT', {
-      'roomCode': widget.roomCode,
       'shotType': type,
       'x': myX,
       'y': myY,
@@ -104,6 +131,8 @@ class _MultiplayerCourtScreenState extends State<MultiplayerCourtScreen> {
   }
 
   void _handleMatchEnd(bool isWinner) async {
+    if (_matchResultSubmitted) return;
+    _matchResultSubmitted = true;
     setState(() {
       isGameOver = true;
       matchStatus = isWinner ? 'VICTORY!' : 'DEFEATED!';
@@ -151,8 +180,8 @@ class _MultiplayerCourtScreenState extends State<MultiplayerCourtScreen> {
                   isDoublePointsActive: false,
                   isAiShrunk: false,
                   playerColor: widget.characterStyle.outfitPrimary,
-                  playerAnimState: game.CharacterAnimState.idle,
-                  aiAnimState: game.CharacterAnimState.idle,
+                  playerAnimState: _animationFor(playerAnimState),
+                  aiAnimState: _animationFor(opponentAnimState),
                   playerFrame: 0,
                   aiFrame: 0,
                 ),

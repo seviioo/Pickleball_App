@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../models/game_models.dart';
 import '../services/api_service.dart';
 import '../services/socket_service.dart';
+import '../services/storage_service.dart';
 import '../theme/app_theme.dart';
 import 'multiplayer_court_screen.dart';
 
@@ -26,6 +28,7 @@ class MultiplayerLobbyScreen extends StatefulWidget {
 
 class _MultiplayerLobbyScreenState extends State<MultiplayerLobbyScreen> {
   String? opponentName;
+  StreamSubscription<Map<String, dynamic>>? _socketSub;
 
   @override
   void initState() {
@@ -33,11 +36,13 @@ class _MultiplayerLobbyScreenState extends State<MultiplayerLobbyScreen> {
     _connectSocket();
   }
 
-  void _connectSocket() {
+  Future<void> _connectSocket() async {
+    final clientId = await StorageService.getOrCreateClientId();
     final wsUrl = ApiService.baseUrl.replaceFirst('http', 'ws');
-    SocketService.instance.connect(wsUrl, widget.roomCode, widget.userName);
+    SocketService.instance
+        .connect(wsUrl, widget.roomCode, widget.userName, clientId);
 
-    SocketService.instance.stream.listen((event) {
+    _socketSub = SocketService.instance.stream.listen((event) {
       if (!mounted) return;
       final type = event['type'];
 
@@ -45,6 +50,13 @@ class _MultiplayerLobbyScreenState extends State<MultiplayerLobbyScreen> {
         setState(() {
           opponentName = event['username'];
         });
+      } else if (type == 'ROOM_STATE') {
+        final players = event['players'];
+        if (players is List && players.isNotEmpty) {
+          setState(() {
+            opponentName = players.first as String;
+          });
+        }
       } else if (type == 'MATCH_STARTED') {
         Navigator.pushReplacement(
           context,
@@ -66,9 +78,14 @@ class _MultiplayerLobbyScreenState extends State<MultiplayerLobbyScreen> {
     final success =
         await ApiService.startRoomMatch(widget.roomCode, widget.userName);
     if (success) {
-      SocketService.instance
-          .sendEvent('START_MATCH', {'roomCode': widget.roomCode});
+      // The backend broadcasts MATCH_STARTED after creating the match.
     }
+  }
+
+  @override
+  void dispose() {
+    _socketSub?.cancel();
+    super.dispose();
   }
 
   @override

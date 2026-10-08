@@ -8,6 +8,7 @@ import { randomBytes, randomUUID, scryptSync, timingSafeEqual } from 'node:crypt
 const app = express();
 const port = Number(process.env.PORT || 3000);
 const socketsByRoom = new Map();
+const matchStates = new Map();
 
 app.use(cors({ origin: process.env.CORS_ORIGIN || '*' }));
 app.use(express.json({ limit: '32kb' }));
@@ -295,6 +296,7 @@ app.post('/api/rooms/:roomCode/start', asyncRoute(async (request, response) => {
   room.matchId = match._id;
   room.status = 'in_progress';
   await room.save();
+  getMatchState(room);
   await MatchEvent.create({
     matchId: match._id,
     sequence: 0,
@@ -331,6 +333,199 @@ function broadcastToRoom(roomCode, message, excludedSocket = null) {
     if (socket !== excludedSocket && socket.readyState === 1) {
       socket.send(encoded);
     }
+
+    const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+
+    function createMatchState(room) {
+      const hostId = room.players[0].playerId.toString();
+      const guestId = room.players[1].playerId.toString();
+      return {
+        roomCode: room.roomCode,
+        hostId,
+        guestId,
+        hostX: 0,
+        hostY: 1.05,
+        guestX: 0,
+        guestY: -0.75,
+        ballX: 0.08,
+        ballY: 1.03,
+        ballHeight: 0.4,
+        vx: 0,
+        vy: 0,
+        vz: 0,
+        servingPlayerId: hostId,
+        phase: 'ready',
+        score: { host: 0, guest: 0 },
+        status: 'YOUR SERVE',
+        sequence: 0,
+        lastTick: Date.now(),
+        animation: { host: 'idle', guest: 'idle' },
+        frames: { host: 0, guest: 0 },
+        input: new Map(),
+      };
+    }
+
+    function getMatchState(room) {
+      let state = matchStates.get(room.roomCode);
+      if (!state && room.players.length >= 2 && room.matchId) {
+        state = createMatchState(room);
+        matchStates.set(room.roomCode, state);
+      }
+      return state;
+    }
+
+    function awardPoint(state, winnerId) {
+      if (winnerId === state.hostId) state.score.host += 1;
+      else state.score.guest += 1;
+      state.servingPlayerId = winnerId;
+      state.phase = 'ready';
+      state.vx = 0;
+      state.vy = 0;
+      state.vz = 0;
+      state.hostX = 0;
+      state.hostY = winnerId === state.hostId ? 1.05 : 0.75;
+      state.guestX = 0;
+      state.guestY = winnerId === state.guestId ? -1.05 : -0.75;
+      state.ballX = winnerId === state.hostId ? 0.08 : -0.08;
+      state.ballY = winnerId === state.hostId ? 1.03 : -1.03;
+      state.ballHeight = winnerId === state.hostId ? 0.4 : 0.3;
+      state.status = winnerId === state.hostId ? 'YOUR SERVE' : 'OPPONENT SERVE';
+      state.animation.host = 'idle';
+      state.animation.guest = 'idle';
+      state.frames.host = 0;
+      state.frames.guest = 0;
+      if ((state.score.host >= 11 || state.score.guest >= 11) &&
+          Math.abs(state.score.host - state.score.guest) >= 2) {
+        state.phase = 'match_over';
+        state.status = state.score.host > state.score.guest
+          ? 'MATCH OVER! HOST WINS!'
+          : 'MATCH OVER! GUEST WINS!';
+      }
+    }
+
+    function startServerShot(state, playerId, shotType) {
+      const isHost = playerId === state.hostId;
+      const px = isHost ? state.hostX : state.guestX;
+      const py = isHost ? state.hostY : state.guestY;
+      const serving = state.phase === 'ready' && state.servingPlayerId === playerId;
+      const canHit = serving || (state.phase === 'rally' &&
+        ((isHost && state.ballY > -0.05) || (!isHost && state.ballY < 0.05)));
+      if (!canHit) return;
+
+      const targetY = isHost ? -0.65 : 0.65;
+      const targetX = clamp(Number.isFinite(Number(shotType.x))
+        ? Number(shotType.x) : px, -0.92, 0.92);
+      const distance = Math.max(0.45, Math.abs(targetY - py));
+      const airTime = shotType.type === 'LOB' ? 1.15 : 0.95;
+      state.ballX = px;
+      state.ballY = py;
+      state.ballHeight = 0.45;
+      state.vx = (targetX - px) / airTime;
+      state.vy = (targetY - py) / airTime;
+      state.vz = (shotType.type === 'LOB' ? 3.8 : 3.1) + distance * 0.2;
+      state.phase = 'rally';
+      state.status = `${isHost ? 'HOST' : 'GUEST'} ${shotType.type}`;
+      state.animation[isHost ? 'host' : 'guest'] =
+        serving ? 'serving' :
+        shotType.type === 'SMASH' ? 'smash' :
+        shotType.type === 'LOB' ? 'lob' :
+        shotType.type === 'ROLL' || shotType.type === 'SLICE' ? 'slice' : 'drive';
+      state.frames[isHost ? 'host' : 'guest'] = 0;
+    }
+
+    function updateMatchState(state, dt) {
+      if (state.phase === 'match_over') return;
+      const hostInput = state.input.get(state.hostId) || { dx: 0, dy: 0 };
+      const guestInput = state.input.get(state.guestId) || { dx: 0, dy: 0 };
+      const move = (value) => clamp(Number(value) || 0, -1, 1);
+      state.hostX = clamp(state.hostX + move(hostInput.dx) * 1.4 * dt, -0.92, 0.92);
+      state.hostY = clamp(state.hostY + move(hostInput.dy) * 1.4 * dt, 0.2, 1.15);
+      state.guestX = clamp(state.guestX + move(guestInput.dx) * 1.4 * dt, -0.92, 0.92);
+      state.guestY = clamp(state.guestY - move(guestInput.dy) * 1.4 * dt, -1.15, -0.2);
+      for (const [key, input] of [[state.hostId, hostInput], [state.guestId, guestInput]]) {
+        const moving = Math.abs(input.dx) > 0.1 || Math.abs(input.dy) > 0.1;
+        state.animation[key === state.hostId ? 'host' : 'guest'] = moving ? 'walking' : 'idle';
+      }
+
+      if (state.phase === 'ready') {
+        if (state.servingPlayerId === state.hostId) {
+          state.ballX = state.hostX + 0.08;
+          state.ballY = state.hostY - 0.02;
+          state.ballHeight = 0.4;
+        } else {
+          state.ballX = state.guestX - 0.08;
+          state.ballY = state.guestY + 0.02;
+          state.ballHeight = 0.3;
+        }
+        return;
+      }
+
+      state.ballX += state.vx * dt;
+      state.ballY += state.vy * dt;
+      state.ballHeight += state.vz * dt - 4.2 * dt * dt * 0.5;
+      state.vz -= 4.2 * dt;
+
+      if (state.ballY * (state.ballY - state.vy * dt) < 0 && state.ballHeight < 0.22) {
+        awardPoint(state, state.ballY > 0 ? state.guestId : state.hostId);
+        return;
+      }
+      if (state.ballHeight <= 0 && state.vz < 0) {
+        state.ballHeight = 0;
+        state.vz = -state.vz * 0.72;
+        state.vx *= 0.86;
+        state.vy *= 0.86;
+        if (Math.abs(state.ballY) > 1.02 || Math.abs(state.ballX) > 1.02) {
+          awardPoint(state, state.ballY > 0 ? state.guestId : state.hostId);
+        }
+      }
+    }
+
+    function snapshotFor(state, playerId) {
+      const hostView = playerId === state.hostId;
+      const flip = (value) => hostView ? value : -value;
+      let status = state.status;
+      if (state.phase === 'ready') {
+        status = state.servingPlayerId === playerId
+          ? 'YOUR SERVE'
+          : 'OPPONENT SERVE';
+      } else {
+        status = status.replace(hostView ? 'HOST' : 'GUEST', 'YOUR');
+        status = status.replace(hostView ? 'GUEST' : 'HOST', 'OPPONENT');
+      }
+      return {
+        type: 'STATE',
+        sequence: state.sequence,
+        phase: state.phase,
+        status,
+        isGameOver: state.score.host >= 11 || state.score.guest >= 11,
+        myScore: hostView ? state.score.host : state.score.guest,
+        opponentScore: hostView ? state.score.guest : state.score.host,
+        isServing: state.servingPlayerId === playerId,
+        ballX: flip(state.ballX),
+        ballY: flip(state.ballY),
+        ballHeight: state.ballHeight,
+        myX: hostView ? state.hostX : state.guestX,
+        myY: hostView ? state.hostY : -state.guestY,
+        opponentX: hostView ? state.guestX : state.hostX,
+        opponentY: hostView ? state.guestY : -state.hostY,
+        playerAnimState: hostView ? state.animation.host : state.animation.guest,
+        opponentAnimState: hostView ? state.animation.guest : state.animation.host,
+      };
+    }
+
+    setInterval(() => {
+      const now = Date.now();
+      for (const state of matchStates.values()) {
+        const dt = Math.min((now - state.lastTick) / 1000, 0.05);
+        state.lastTick = now;
+        updateMatchState(state, dt);
+        state.sequence += 1;
+        const sockets = socketsByRoom.get(state.roomCode) || [];
+        for (const socket of sockets) {
+          if (socket.readyState === 1) socket.send(JSON.stringify(snapshotFor(state, socket.clientId)));
+        }
+      }
+    }, 50);
   }
 }
 
@@ -423,11 +618,19 @@ webSocketServer.on('connection', async (socket, request) => {
     try {
       const message = JSON.parse(rawMessage.toString());
       if (!message || typeof message.type !== 'string') return;
-      broadcastToRoom(roomCode, {
-        type: message.type,
-        ...message,
-        username: socket.username,
-      }, socket);
+      const state = matchStates.get(roomCode);
+      if (!state) return;
+      if (message.type === 'MOVE') {
+        state.input.set(socket.clientId, {
+          dx: Number(message.dx) || 0,
+          dy: Number(message.dy) || 0,
+        });
+      } else if (message.type === 'SHOT') {
+        startServerShot(state, socket.clientId, {
+          type: String(message.shotType || 'DRIVE'),
+          x: message.x,
+        });
+      }
     } catch (error) {
       console.error('Invalid WebSocket message:', error);
       socket.send(JSON.stringify({ type: 'ERROR', message: 'Invalid event' }));
@@ -440,6 +643,10 @@ webSocketServer.on('connection', async (socket, request) => {
   });
 
   socket.send(JSON.stringify({ type: 'CONNECTED', username: socket.username }));
+  const state = getMatchState(room);
+  if (state) {
+    socket.send(JSON.stringify(snapshotFor(state, socket.clientId)));
+  }
   const connectedPlayers = room.players
     .map((entry) => entry.playerId.toString())
     .filter((playerId) => playerId !== player._id.toString());
