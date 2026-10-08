@@ -344,6 +344,13 @@ function broadcastToRoom(roomCode, message, excludedSocket = null) {
 }
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+const GRAVITY = 8.0;
+const AIR_DRAG = 0.35;
+const BOUNCE_RESTITUTION = 0.66;
+const BOUNCE_FRICTION = 0.82;
+const SPIN_MAGNUS = 0.5;
+const NET_HEIGHT = 0.55;
+const NET_CLEARANCE = 0.08;
 
     function createMatchState(room) {
       const hostId = room.players[0].playerId.toString();
@@ -362,6 +369,11 @@ const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
         vx: 0,
         vy: 0,
         vz: 0,
+        spin: 0,
+        effectiveGravity: GRAVITY,
+        bounceCount: 0,
+        serveInFlight: false,
+        lastHitBy: hostId,
         servingPlayerId: hostId,
         phase: 'ready',
         score: { host: 0, guest: 0 },
@@ -392,6 +404,10 @@ const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
       state.vx = 0;
       state.vy = 0;
       state.vz = 0;
+      state.spin = 0;
+      state.effectiveGravity = GRAVITY;
+      state.bounceCount = 0;
+      state.serveInFlight = false;
       state.hostX = 0;
       state.hostY = winnerId === state.hostId ? 1.05 : 0.75;
       state.guestX = 0;
@@ -422,24 +438,70 @@ const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
         ((isHost && state.ballY > -0.05) || (!isHost && state.ballY < 0.05)));
       if (!canHit) return;
 
-      const targetY = isHost ? -0.65 : 0.65;
+      const type = String(shotType.type || 'DRIVE').toUpperCase();
+      const targetDepth = type === 'SMASH' ? 0.80 :
+        type === 'LOB' ? 0.85 :
+        type === 'ROLL' || type === 'SLICE' ? 0.28 :
+        serving ? 0.65 : 0.72;
+      const airTime = type === 'SMASH' ? 0.60 :
+        type === 'LOB' ? 1.15 :
+        type === 'ROLL' || type === 'SLICE' ? 0.85 :
+        serving ? 0.95 : 0.80;
+      const spin = type === 'SMASH' ? 0.7 :
+        type === 'LOB' ? 0.3 :
+        type === 'ROLL' || type === 'SLICE' ? -0.8 :
+        serving ? 0.0 : 0.35;
+      const targetY = isHost ? -targetDepth : targetDepth;
       const targetX = clamp(Number.isFinite(Number(shotType.x))
         ? Number(shotType.x) : px, -0.92, 0.92);
-      const distance = Math.max(0.45, Math.abs(targetY - py));
-      const airTime = shotType.type === 'LOB' ? 1.15 : 0.95;
       state.ballX = px;
       state.ballY = py;
       state.ballHeight = 0.45;
-      state.vx = (targetX - px) / airTime;
-      state.vy = (targetY - py) / airTime;
-      state.vz = (shotType.type === 'LOB' ? 3.8 : 3.1) + distance * 0.2;
+      const dx = targetX - state.ballX;
+      const dy = targetY - state.ballY;
+      const crossesNet = state.ballY * targetY < 0;
+      let vx = 0;
+      let vy = 0;
+      let vz = 0;
+      let effectiveGravity = GRAVITY;
+      let flightTime = airTime;
+      for (let i = 0; i < 12; i += 1) {
+        const decay = 1 - Math.exp(-AIR_DRAG * flightTime);
+        vx = dx * AIR_DRAG / decay;
+        vy = dy * AIR_DRAG / decay;
+        const speed = Math.sqrt(vx * vx + vy * vy);
+        effectiveGravity = Math.max(
+          GRAVITY + spin * SPIN_MAGNUS * speed,
+          3.0
+        );
+        vz = (effectiveGravity * flightTime / AIR_DRAG - state.ballHeight) *
+          AIR_DRAG / decay - effectiveGravity / AIR_DRAG;
+        if (!crossesNet || Math.abs(vy) < 0.0001) break;
+        const argument = 1 + state.ballY * AIR_DRAG / vy;
+        if (argument <= 0) break;
+        const netTime = -Math.log(argument) / AIR_DRAG;
+        const netHeight = state.ballHeight +
+          (vz + effectiveGravity / AIR_DRAG) *
+            (1 - Math.exp(-AIR_DRAG * netTime)) / AIR_DRAG -
+          effectiveGravity * netTime / AIR_DRAG;
+        if (netHeight >= NET_HEIGHT + NET_CLEARANCE) break;
+        flightTime += 0.05;
+      }
+      state.vx = vx;
+      state.vy = vy;
+      state.vz = vz;
+      state.spin = spin;
+      state.effectiveGravity = effectiveGravity;
+      state.bounceCount = 0;
+      state.serveInFlight = serving;
+      state.lastHitBy = playerId;
       state.phase = 'rally';
-      state.status = `${isHost ? 'HOST' : 'GUEST'} ${shotType.type}`;
+      state.status = `${isHost ? 'HOST' : 'GUEST'} ${type}`;
       state.animation[isHost ? 'host' : 'guest'] =
         serving ? 'serving' :
-        shotType.type === 'SMASH' ? 'smash' :
-        shotType.type === 'LOB' ? 'lob' :
-        shotType.type === 'ROLL' || shotType.type === 'SLICE' ? 'slice' : 'drive';
+        type === 'SMASH' ? 'smash' :
+        type === 'LOB' ? 'lob' :
+        type === 'ROLL' || type === 'SLICE' ? 'slice' : 'drive';
       state.frames[isHost ? 'host' : 'guest'] = 0;
     }
 
@@ -476,23 +538,62 @@ const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
         return;
       }
 
-      state.ballX += state.vx * dt;
-      state.ballY += state.vy * dt;
-      state.ballHeight += state.vz * dt - 4.2 * dt * dt * 0.5;
-      state.vz -= 4.2 * dt;
+      const dragFactor = Math.exp(-AIR_DRAG * dt);
+      const previousY = state.ballY;
+      state.ballX += state.vx * (1 - dragFactor) / AIR_DRAG;
+      state.ballY += state.vy * (1 - dragFactor) / AIR_DRAG;
+      state.ballHeight +=
+        (state.vz + state.effectiveGravity / AIR_DRAG) *
+          (1 - dragFactor) / AIR_DRAG -
+        state.effectiveGravity * dt / AIR_DRAG;
+      state.vx *= dragFactor;
+      state.vy *= dragFactor;
+      state.vz = state.vz * dragFactor -
+        state.effectiveGravity * (1 - dragFactor) / AIR_DRAG;
 
-      if (state.ballY * (state.ballY - state.vy * dt) < 0 && state.ballHeight < 0.22) {
-        awardPoint(state, state.ballY > 0 ? state.guestId : state.hostId);
+      if (previousY * state.ballY < 0 && state.ballHeight < NET_HEIGHT) {
+        awardPoint(state, state.lastHitBy === state.hostId
+          ? state.guestId
+          : state.hostId);
         return;
       }
       if (state.ballHeight <= 0 && state.vz < 0) {
         state.ballHeight = 0;
-        state.vz = -state.vz * 0.72;
-        state.vx *= 0.86;
-        state.vy *= 0.86;
-        if (Math.abs(state.ballY) > 1.02 || Math.abs(state.ballX) > 1.02) {
+        state.bounceCount += 1;
+        if (state.bounceCount === 1) {
+          const outOfBounds = Math.abs(state.ballX) > 1.02 ||
+            Math.abs(state.ballY) > 1.02;
+          const wrongSide = state.lastHitBy === state.hostId
+            ? state.ballY > 0
+            : state.ballY < 0;
+          const shortServe = state.serveInFlight &&
+            Math.abs(state.ballY) < 0.32;
+          if (outOfBounds || wrongSide || shortServe) {
+            awardPoint(state, state.lastHitBy === state.hostId
+              ? state.guestId
+              : state.hostId);
+            return;
+          }
+        } else {
           awardPoint(state, state.ballY > 0 ? state.guestId : state.hostId);
+          return;
         }
+        const verticalKeep = clamp(
+          BOUNCE_RESTITUTION * (1 - 0.18 * state.spin),
+          0.35,
+          0.85
+        );
+        const horizontalKeep = clamp(
+          BOUNCE_FRICTION * (1 + 0.22 * state.spin),
+          0.45,
+          1.05
+        );
+        state.vz = -state.vz * verticalKeep;
+        state.vx *= horizontalKeep;
+        state.vy *= horizontalKeep;
+        state.effectiveGravity =
+          GRAVITY + (state.effectiveGravity - GRAVITY) * 0.4;
+        state.spin *= 0.4;
       }
     }
 
