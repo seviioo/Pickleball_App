@@ -371,6 +371,7 @@ const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
         animation: { host: 'idle', guest: 'idle' },
         frames: { host: 0, guest: 0 },
         input: new Map(),
+        inputAt: new Map(),
       };
     }
 
@@ -444,8 +445,14 @@ const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 
     function updateMatchState(state, dt) {
       if (state.phase === 'match_over') return;
-      const hostInput = state.input.get(state.hostId) || { dx: 0, dy: 0 };
-      const guestInput = state.input.get(state.guestId) || { dx: 0, dy: 0 };
+      const activeInput = (playerId) => {
+        const lastInput = state.inputAt.get(playerId) || 0;
+        return Date.now() - lastInput < 180
+          ? state.input.get(playerId) || { dx: 0, dy: 0 }
+          : { dx: 0, dy: 0 };
+      };
+      const hostInput = activeInput(state.hostId);
+      const guestInput = activeInput(state.guestId);
       const move = (value) => clamp(Number(value) || 0, -1, 1);
       state.hostX = clamp(state.hostX + move(hostInput.dx) * 1.4 * dt, -0.92, 0.92);
       state.hostY = clamp(state.hostY + move(hostInput.dy) * 1.4 * dt, 0.2, 1.15);
@@ -630,10 +637,10 @@ webSocketServer.on('connection', async (socket, request) => {
       const state = matchStates.get(roomCode);
       if (!state) return;
       if (message.type === 'MOVE') {
-        state.input.set(socket.clientId, {
-          dx: Number(message.dx) || 0,
-          dy: Number(message.dy) || 0,
-        });
+        const dx = clamp(Number(message.dx) || 0, -1, 1);
+        const dy = clamp(Number(message.dy) || 0, -1, 1);
+        state.input.set(socket.clientId, { dx, dy });
+        state.inputAt.set(socket.clientId, Date.now());
       } else if (message.type === 'SHOT') {
         startServerShot(state, socket.clientId, {
           type: String(message.shotType || 'DRIVE'),

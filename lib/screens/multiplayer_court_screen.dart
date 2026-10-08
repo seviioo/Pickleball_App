@@ -47,6 +47,8 @@ class _MultiplayerCourtScreenState extends State<MultiplayerCourtScreen> {
   String playerAnimState = 'idle';
   String opponentAnimState = 'idle';
   bool _matchResultSubmitted = false;
+  Offset _movementDirection = Offset.zero;
+  Timer? _movementTimer;
 
   StreamSubscription? _socketSub;
 
@@ -110,9 +112,17 @@ class _MultiplayerCourtScreenState extends State<MultiplayerCourtScreen> {
   }
 
   void _onJoystickMove(Offset direction) {
-    SocketService.instance.sendEvent('MOVE', {
-      'dx': direction.dx,
-      'dy': direction.dy,
+    _movementDirection = direction;
+    _movementTimer ??= Timer.periodic(const Duration(milliseconds: 50), (_) {
+      final direction = _movementDirection;
+      SocketService.instance.sendEvent('MOVE', {
+        'dx': direction.dx,
+        'dy': direction.dy,
+      });
+      if (direction == Offset.zero) {
+        _movementTimer?.cancel();
+        _movementTimer = null;
+      }
     });
   }
 
@@ -147,6 +157,8 @@ class _MultiplayerCourtScreenState extends State<MultiplayerCourtScreen> {
 
   @override
   void dispose() {
+    _movementDirection = Offset.zero;
+    _movementTimer?.cancel();
     _socketSub?.cancel();
     super.dispose();
   }
