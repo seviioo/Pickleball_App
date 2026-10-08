@@ -2,10 +2,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../game/pickleball_game.dart' as game;
 import '../models/game_models.dart';
-import '../painters/perspective_court_painter.dart'; // Defines CharacterAnimState
+import '../painters/perspective_court_painter.dart';
 import '../services/api_service.dart';
 import '../services/socket_service.dart';
-import 'court_gameplay_screen.dart'; // Provides TouchJoystickWheel widget
+import 'court_gameplay_screen.dart';
 
 class MultiplayerCourtScreen extends StatefulWidget {
   final String userName;
@@ -129,6 +129,9 @@ class _MultiplayerCourtScreenState extends State<MultiplayerCourtScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final bool isLandscape =
+        MediaQuery.of(context).orientation == Orientation.landscape;
+
     return Scaffold(
       backgroundColor: const Color(0xFF09090B),
       body: SafeArea(
@@ -156,17 +159,19 @@ class _MultiplayerCourtScreenState extends State<MultiplayerCourtScreen> {
               ),
             ),
 
-            // Header Scoreboard (VS AI Yellow Theme)
+            // Header Scoreboard
             Positioned(
-              top: 12,
+              top: isLandscape ? 6 : 12,
               left: 12,
               right: 12,
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: isLandscape ? 12 : 16,
+                      vertical: isLandscape ? 4 : 8,
+                    ),
                     decoration: BoxDecoration(
                       color: const Color(0xFF18181B),
                       borderRadius: BorderRadius.circular(12),
@@ -180,9 +185,9 @@ class _MultiplayerCourtScreenState extends State<MultiplayerCourtScreen> {
                         const SizedBox(width: 8),
                         Text(
                           '${widget.userName}: $myScore  |  ${widget.opponentName}: $opponentScore',
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: Colors.white,
-                            fontSize: 16,
+                            fontSize: isLandscape ? 14 : 16,
                             fontWeight: FontWeight.w900,
                           ),
                         ),
@@ -195,7 +200,7 @@ class _MultiplayerCourtScreenState extends State<MultiplayerCourtScreen> {
 
             // Status Banner
             Positioned(
-              top: 68,
+              top: isLandscape ? 44 : 68,
               left: 0,
               right: 0,
               child: Center(
@@ -223,15 +228,15 @@ class _MultiplayerCourtScreenState extends State<MultiplayerCourtScreen> {
             // Touch Controls
             if (!isGameOver) ...[
               Positioned(
-                left: 24,
-                bottom: 24,
+                left: isLandscape ? 36 : 24,
+                bottom: isLandscape ? 16 : 24,
                 child: TouchJoystickWheel(
                   onJoystickMoved: _onJoystickMove,
                 ),
               ),
               Positioned(
-                right: 20,
-                bottom: 20,
+                right: isLandscape ? 36 : 20,
+                bottom: isLandscape ? 12 : 20,
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.end,

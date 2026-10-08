@@ -89,6 +89,8 @@ class PerspectiveCourtPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    final bool isLandscape = size.width > size.height;
+
     final darkAsphaltPaint = Paint()
       ..color = const Color(0xFF09090B)
       ..style = PaintingStyle.fill;
@@ -104,9 +106,11 @@ class PerspectiveCourtPainter extends CustomPainter {
       Paint()..shader = streetGradient.createShader(Offset.zero & size),
     );
 
-    // Calculate realistic court scaling & proportions without stretching
-    final double maxCourtWidth = size.width * 0.85;
-    final double maxCourtHeight = size.height * 0.80;
+    // Calculate court scaling & proportions dynamically for orientation
+    final double maxCourtWidth =
+        isLandscape ? size.width * 0.60 : size.width * 0.85;
+    final double maxCourtHeight =
+        isLandscape ? size.height * 0.85 : size.height * 0.80;
 
     // Pick proportional width/height bounds
     final double courtHeight = min(maxCourtHeight, maxCourtWidth * 1.6);

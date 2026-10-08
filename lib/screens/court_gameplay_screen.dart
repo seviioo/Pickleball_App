@@ -404,7 +404,7 @@ class _CourtGameplayScreenState extends State<CourtGameplayScreen> {
                 ),
                 // Header Bar
                 Positioned(
-                  top: 12,
+                  top: isLandscape ? 6 : 12,
                   left: 12,
                   right: 12,
                   child: Row(
@@ -418,8 +418,9 @@ class _CourtGameplayScreenState extends State<CourtGameplayScreen> {
                         ],
                       ),
                       Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 8),
+                        padding: EdgeInsets.symmetric(
+                            horizontal: isLandscape ? 12 : 16,
+                            vertical: isLandscape ? 4 : 8),
                         decoration: BoxDecoration(
                           color: const Color(0xFF18181B),
                           borderRadius: BorderRadius.circular(12),
@@ -433,9 +434,9 @@ class _CourtGameplayScreenState extends State<CourtGameplayScreen> {
                             const SizedBox(width: 8),
                             Text(
                               '$playerScore - $opponentScore',
-                              style: const TextStyle(
+                              style: TextStyle(
                                 color: Colors.white,
-                                fontSize: 20,
+                                fontSize: isLandscape ? 16 : 20,
                                 fontWeight: FontWeight.w900,
                               ),
                             ),
@@ -464,7 +465,7 @@ class _CourtGameplayScreenState extends State<CourtGameplayScreen> {
                 ),
                 // Status Banner
                 Positioned(
-                  top: isLandscape ? 56 : 68,
+                  top: isLandscape ? 44 : 68,
                   left: 0,
                   right: 0,
                   child: Center(
@@ -492,7 +493,7 @@ class _CourtGameplayScreenState extends State<CourtGameplayScreen> {
                   // Dynamic Joystick Control Placement
                   Positioned(
                     left: isLandscape ? 36 : 24,
-                    bottom: isLandscape ? 20 : 24,
+                    bottom: isLandscape ? 16 : 24,
                     child: TouchJoystickWheel(
                       onJoystickMoved: (Offset direction) {
                         game.updatePlayerMovement(direction);
@@ -502,7 +503,7 @@ class _CourtGameplayScreenState extends State<CourtGameplayScreen> {
                   // Dynamic Action Button Controls
                   Positioned(
                     right: isLandscape ? 36 : 20,
-                    bottom: isLandscape ? 16 : 20,
+                    bottom: isLandscape ? 12 : 20,
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.end,
@@ -510,10 +511,10 @@ class _CourtGameplayScreenState extends State<CourtGameplayScreen> {
                         if (isPlayerServing &&
                             gameState == GameMatchState.ready)
                           Padding(
-                            padding: const EdgeInsets.only(bottom: 12),
+                            padding: const EdgeInsets.only(bottom: 8),
                             child: SizedBox(
-                              width: 130,
-                              height: 48,
+                              width: 120,
+                              height: isLandscape ? 40 : 48,
                               child: ElevatedButton.icon(
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: const Color(0xFFFACC15),
@@ -522,7 +523,7 @@ class _CourtGameplayScreenState extends State<CourtGameplayScreen> {
                                       borderRadius: BorderRadius.circular(12)),
                                 ),
                                 onPressed: () => game.triggerAttack('SERVE'),
-                                icon: const Icon(Icons.sports_tennis, size: 20),
+                                icon: const Icon(Icons.sports_tennis, size: 18),
                                 label: const Text('SERVE',
                                     style:
                                         TextStyle(fontWeight: FontWeight.w900)),
