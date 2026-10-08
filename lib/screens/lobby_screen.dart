@@ -248,22 +248,37 @@ class _LobbyScreenState extends State<LobbyScreen> {
               ),
               const SizedBox(height: 12),
               _buildMenuCard(
-                title: 'ONLINE MULTIPLAYER',
-                subtitle: 'Play against real players live via Room Code',
-                icon: Icons.public,
-                color: Colors.greenAccent,
-                onTap: () async {
-                  await Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => MultiplayerHubScreen(
-                        userName: widget.userName,
-                        characterStyle: widget.characterStyle,
-                      ),
-                    ),
-                  );
-                  _loadUserData();
-                },
+                title: widget.isOffline
+                    ? 'ONLINE MULTIPLAYER LOCKED'
+                    : 'ONLINE MULTIPLAYER',
+                subtitle: widget.isOffline
+                    ? 'Connect to the internet to play against real players'
+                    : 'Play against real players live via Room Code',
+                icon: widget.isOffline ? Icons.lock_outline : Icons.public,
+                color: widget.isOffline
+                    ? Colors.white38
+                    : Colors.greenAccent,
+                onTap: widget.isOffline
+                    ? () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                                'Online multiplayer is unavailable in offline mode.'),
+                          ),
+                        );
+                      }
+                    : () async {
+                        await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => MultiplayerHubScreen(
+                              userName: widget.userName,
+                              characterStyle: widget.characterStyle,
+                            ),
+                          ),
+                        );
+                        _loadUserData();
+                      },
               ),
               const SizedBox(height: 12),
               _buildMenuCard(

@@ -18,6 +18,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _isLoading = false;
+  bool _isPasswordVisible = false;
 
   Future<void> _handleLogin() async {
     final username = _usernameController.text.trim();
@@ -33,9 +34,11 @@ class _LoginScreenState extends State<LoginScreen> {
 
     setState(() => _isLoading = true);
 
+    String? errorMessage;
     final result = await ApiService.login(
       username: username,
       password: password,
+      onError: (message) => errorMessage = message,
     );
 
     setState(() => _isLoading = false);
@@ -56,7 +59,7 @@ class _LoginScreenState extends State<LoginScreen> {
     } else {
       _showAccountNotFoundDialog(
         title: 'Invalid Credentials',
-        message:
+        message: errorMessage ??
             'Incorrect username or password. Please try again or create a profile.',
       );
     }
@@ -164,7 +167,13 @@ class _LoginScreenState extends State<LoginScreen> {
                       controller: _passwordController,
                       hint: 'Password',
                       icon: Icons.lock_outline,
-                      obscureText: true),
+                      obscureText: !_isPasswordVisible,
+                      isPassword: true,
+                      onTogglePassword: () {
+                        setState(() {
+                          _isPasswordVisible = !_isPasswordVisible;
+                        });
+                      }),
                   const SizedBox(height: 24),
                   _isLoading
                       ? const CircularProgressIndicator(color: AppColors.gold)
@@ -211,7 +220,9 @@ class _LoginScreenState extends State<LoginScreen> {
       {required TextEditingController controller,
       required String hint,
       required IconData icon,
-      bool obscureText = false}) {
+      bool obscureText = false,
+      bool isPassword = false,
+      VoidCallback? onTogglePassword}) {
     return Container(
       decoration: BoxDecoration(
           color: AppColors.surface,
@@ -224,6 +235,18 @@ class _LoginScreenState extends State<LoginScreen> {
             color: AppColors.textPrimary, fontWeight: FontWeight.w700),
         decoration: InputDecoration(
             prefixIcon: Icon(icon, color: AppColors.gold, size: 20),
+            suffixIcon: isPassword
+                ? IconButton(
+                    icon: Icon(
+                      obscureText
+                          ? Icons.visibility_outlined
+                          : Icons.visibility_off_outlined,
+                      color: AppColors.gold,
+                    ),
+                    tooltip: obscureText ? 'Show password' : 'Hide password',
+                    onPressed: onTogglePassword,
+                  )
+                : null,
             hintText: hint,
             hintStyle: const TextStyle(color: AppColors.textFaint),
             border: InputBorder.none,

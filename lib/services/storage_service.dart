@@ -31,6 +31,12 @@ class StorageService {
     return clientId;
   }
 
+  static Future<void> saveClientId(String clientId) async {
+    if (clientId.trim().isEmpty) return;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_keyClientId, clientId.trim());
+  }
+
   // Audio & Haptics Settings
   static Future<bool> getSoundEnabled() async {
     final prefs = await SharedPreferences.getInstance();
