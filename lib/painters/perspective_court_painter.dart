@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import '../game/pickleball_game.dart';
+import '../models/game_models.dart' show PaddleData;
 
 class PerspectiveCourtPainter extends CustomPainter {
   final double ballX;
@@ -17,6 +18,7 @@ class PerspectiveCourtPainter extends CustomPainter {
   final bool isAiShrunk;
   final String? timingFeedback;
   final Color playerColor;
+  final PaddleData? playerPaddle; // <-- EQUIPPED PADDLE PASSED HERE
   final bool isUltimateActive;
   final CharacterAnimState playerAnimState;
   final CharacterAnimState aiAnimState;
@@ -59,6 +61,7 @@ class PerspectiveCourtPainter extends CustomPainter {
     required this.isAiShrunk,
     this.timingFeedback,
     required this.playerColor,
+    this.playerPaddle,
     this.isUltimateActive = false,
     required this.playerAnimState,
     required this.aiAnimState,
@@ -112,7 +115,6 @@ class PerspectiveCourtPainter extends CustomPainter {
     final double maxCourtHeight =
         isLandscape ? size.height * 0.85 : size.height * 0.80;
 
-    // Pick proportional width/height bounds
     final double courtHeight = min(maxCourtHeight, maxCourtWidth * 1.6);
     final double topWidth = courtHeight * 0.35;
     final double bottomWidth = courtHeight * 0.65;
@@ -305,7 +307,7 @@ class PerspectiveCourtPainter extends CustomPainter {
           Offset(to.dx, to.dy + ry * 0.5), aimStroke);
     }
 
-    // AI Chibi Render
+    // AI Chibi Render (Opponent stays default red paddle)
     Offset oppPos = perspectiveTransform(opponentX, opponentY);
     _drawAnimatedChibi(
       canvas,
@@ -321,7 +323,7 @@ class PerspectiveCourtPainter extends CustomPainter {
       actionProgress: aiActionProgress,
     );
 
-    // Player Chibi Render
+    // Player Chibi Render (Uses equipped paddle design)
     Offset playerPos = perspectiveTransform(playerX, playerY);
     _drawAnimatedChibi(
       canvas,
@@ -335,6 +337,7 @@ class PerspectiveCourtPainter extends CustomPainter {
       moveAmount: playerMoveAmount,
       moveX: playerMoveX,
       actionProgress: playerActionProgress,
+      equippedPaddle: playerPaddle,
     );
 
     // Ball & Trail Rendering
@@ -472,6 +475,59 @@ class PerspectiveCourtPainter extends CustomPainter {
     return keys.last.sublist(1);
   }
 
+  Color _getPaddleColor(PaddleData? paddle, bool isGlowing) {
+    if (isGlowing) return const Color(0xFFF97316);
+    if (paddle == null) return const Color(0xFFEF4444);
+
+    // Map paddle ID to its distinct visual color matching shop aesthetics
+    switch (paddle.id) {
+      case 'vatic_prism_flash':
+        return const Color(0xFF1E293B); // Dark Stealth Black/Slate
+      case 'engage_pursuit_maxx':
+        return const Color(0xFF0284C7); // Deep Pursuit Blue
+      case 'engage_pursuit_graphite':
+        return const Color(0xFF334155); // Graphite Gray
+      case 'onix_z5':
+        return const Color(0xFF16A34A); // Onix Green
+      case 'head_radical_pro':
+        return const Color(0xFFEA580C); // Radical Orange
+      case 'paddletek_ts5':
+        return const Color(0xFF2563EB); // Paddletek Blue
+      case 'franklin_ben_johns':
+        return const Color(0xFFD97706); // Amber Gold
+      case 'crbn_genesis_1':
+      case 'crbn_genesis_2':
+      case 'crbn_waves_1':
+        return const Color(0xFF0F172A); // Matte Black Carbon
+      case 'ronbus_r1_nova':
+        return const Color(0xFF0D9488); // Nova Cyan
+      case 'gearbox_cx14e':
+        return const Color(0xFF475569); // Gearbox Metallic
+      case 'selkirk_luxx_invikta':
+      case 'selkirk_power_air':
+        return const Color(0xFFE11D48); // Selkirk Crimson
+      case 'joola_perseus_pro_4':
+      case 'joola_perseus_pro_5':
+      case 'joola_mod_ta15':
+        return const Color(0xFF111827); // JOOLA Tactical Black
+      case 'honolulu_j6cr':
+        return const Color(0xFF38BDF8); // Crystal Blue
+      case 'honolulu_j6nf':
+        return const Color(0xFF818CF8); // Honolulu Violet
+      case 'sixzero_black_opal':
+      case 'sixzero_coral_pro_elongated':
+      case 'sixzero_coral_pro_widebody':
+        return const Color(0xFF4C1D95); // Coral Purple/Opal
+      case 'diadem_vice':
+        return const Color(0xFFEC4899); // VICE Neon Pink
+      case 'prokennex_black_ace':
+        return const Color(0xFF18181B); // Black Ace Dark
+      case 'starter_paddle':
+      default:
+        return const Color(0xFFEF4444); // Fallback Red
+    }
+  }
+
   void _drawAnimatedChibi(
     Canvas canvas, {
     required Offset position,
@@ -485,6 +541,7 @@ class PerspectiveCourtPainter extends CustomPainter {
     required double moveAmount,
     required double moveX,
     required double actionProgress,
+    PaddleData? equippedPaddle,
   }) {
     final double side = isPlayer ? 1.0 : -1.0;
     final bool acting = _isAction(animState) && actionProgress < 1.0;
@@ -661,6 +718,7 @@ class PerspectiveCourtPainter extends CustomPainter {
     canvas.rotate(paddleAngle);
     canvas.scale(paddleScale);
 
+    // Paddle Handle / Grip
     canvas.drawRRect(
       RRect.fromRectAndRadius(
         Rect.fromCenter(center: const Offset(0, 4), width: 3.5, height: 9),
@@ -669,13 +727,34 @@ class PerspectiveCourtPainter extends CustomPainter {
       Paint()..color = const Color(0xFF3F3F46),
     );
 
+    // Paddle Face / Blade (Rendered with equipped paddle's design/color)
+    final Color paddleFaceColor = isPlayer
+        ? _getPaddleColor(equippedPaddle, isGlowing)
+        : const Color(0xFFEF4444);
+
+    // Outer Edge Guard
     canvas.drawRRect(
       RRect.fromRectAndRadius(
-        Rect.fromCenter(center: const Offset(0, -8), width: 15, height: 19),
-        const Radius.circular(5),
+        Rect.fromCenter(center: const Offset(0, -8), width: 16, height: 20),
+        const Radius.circular(5.5),
       ),
-      Paint()
-        ..color = isGlowing ? const Color(0xFFF97316) : const Color(0xFFEF4444),
+      Paint()..color = const Color(0xFF18181B),
+    );
+
+    // Main Paddle Face
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromCenter(center: const Offset(0, -8), width: 14, height: 18),
+        const Radius.circular(4.5),
+      ),
+      Paint()..color = paddleFaceColor,
+    );
+
+    // Brand / Logo Emblem Highlight on Paddle Face
+    canvas.drawCircle(
+      const Offset(0, -8),
+      2.5,
+      Paint()..color = Colors.white.withOpacity(0.85),
     );
 
     canvas.restore();

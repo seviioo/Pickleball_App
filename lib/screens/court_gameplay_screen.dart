@@ -364,6 +364,7 @@ class _CourtGameplayScreenState extends State<CourtGameplayScreen> {
                       isAiShrunk: isAiShrunk,
                       timingFeedback: timingFeedback,
                       playerColor: widget.characterStyle.outfitPrimary,
+                      playerPaddle: widget.paddle, // <-- PASSED HERE
                       isUltimateActive: isUltimateActive,
                       playerAnimState: playerAnimState,
                       aiAnimState: aiAnimState,
