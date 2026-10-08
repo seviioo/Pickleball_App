@@ -32,34 +32,28 @@ class CourtGameplayScreen extends StatefulWidget {
 
 class _CourtGameplayScreenState extends State<CourtGameplayScreen> {
   late PickleballGame game;
-
   int playerScore = 0;
   int opponentScore = 0;
   bool isPlayerServing = true;
   String matchStatus = 'STREET SERVE READY';
   bool isGameOver = false;
+  GameMatchState gameState = GameMatchState.ready;
   bool _hasShownGameOverModal = false;
 
   double ultimateGauge = 0.0;
   bool isUltimateActive = false;
-
   double ballX = 0.0;
   double ballY = 0.85;
   double ballHeight = 0.4;
-
   double playerX = 0.0;
   double playerY = 0.85;
-
   double opponentX = 0.0;
   double opponentY = -0.85;
-
   double? orbX;
   double? orbY;
   OrbType? orbType;
-
   bool isDoublePointsActive = false;
   bool isAiShrunk = false;
-
   String? timingFeedback;
 
   CharacterAnimState playerAnimState = CharacterAnimState.idle;
@@ -86,6 +80,7 @@ class _CourtGameplayScreenState extends State<CourtGameplayScreen> {
         required bool isPlayerServing,
         required String matchStatus,
         required bool isGameOver,
+        required GameMatchState gameState,
         required double ballX,
         required double ballY,
         required double ballHeight,
@@ -114,6 +109,7 @@ class _CourtGameplayScreenState extends State<CourtGameplayScreen> {
               this.isPlayerServing = isPlayerServing;
               this.matchStatus = matchStatus;
               this.isGameOver = isGameOver;
+              this.gameState = gameState;
               this.ballX = ballX;
               this.ballY = ballY;
               this.ballHeight = ballHeight;
@@ -224,6 +220,7 @@ class _CourtGameplayScreenState extends State<CourtGameplayScreen> {
   }
 
   void _openPauseMenu() {
+    game.pauseGame();
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -256,7 +253,10 @@ class _CourtGameplayScreenState extends State<CourtGameplayScreen> {
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12)),
                     ),
-                    onPressed: () => Navigator.pop(context),
+                    onPressed: () {
+                      game.resumeGame();
+                      Navigator.pop(context);
+                    },
                     child: const Text('RESUME MATCH',
                         style: TextStyle(fontWeight: FontWeight.w900)),
                   ),
@@ -341,212 +341,231 @@ class _CourtGameplayScreenState extends State<CourtGameplayScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFF09090B),
       body: SafeArea(
-        child: Stack(
-          children: [
-            Positioned.fill(
-              child: CustomPaint(
-                painter: PerspectiveCourtPainter(
-                  ballX: ballX,
-                  ballY: ballY,
-                  ballHeight: ballHeight,
-                  playerX: playerX,
-                  playerY: playerY,
-                  opponentX: opponentX,
-                  opponentY: opponentY,
-                  orbX: orbX,
-                  orbY: orbY,
-                  orbType: orbType,
-                  isDoublePointsActive: isDoublePointsActive,
-                  isAiShrunk: isAiShrunk,
-                  timingFeedback: timingFeedback,
-                  playerColor: widget.characterStyle.outfitPrimary,
-                  isUltimateActive: isUltimateActive,
-                  playerAnimState: playerAnimState,
-                  aiAnimState: aiAnimState,
-                  playerFrame: playerFrame,
-                  aiFrame: aiFrame,
-                  ballVx: game.ballVx,
-                  ballVy: game.ballVy,
-                  ballVz: game.ballVz,
-                  ballRotation: game.ballRotation,
-                  ballImpact: game.ballImpactTimer,
-                  trail: List.of(game.trail),
-                  animClock: game.animClock,
-                  playerWalkPhase: game.playerWalkPhase,
-                  aiWalkPhase: game.aiWalkPhase,
-                  playerMoveAmount:
-                      game.playerInputDir.distance.clamp(0.0, 1.0).toDouble(),
-                  playerMoveX:
-                      game.playerInputDir.dx.clamp(-1.0, 1.0).toDouble(),
-                  aiMoveAmount: game.aiMoveAmount,
-                  aiMoveX: (game.aiVelX / 0.9).clamp(-1.0, 1.0).toDouble(),
-                  playerActionProgress: game.playerAnimProgress,
-                  aiActionProgress: game.aiAnimProgress,
-                  playerReach: game.playerReach,
-                  ballInReach: game.ballInPlayerReach,
-                  aimX: game.playerAimPreview.dx,
-                  aimY: game.playerAimPreview.dy,
-                  aimScatter: game.playerAimScatter,
-                  showAim: game.showAimPreview,
+        child: OrientationBuilder(
+          builder: (context, orientation) {
+            final bool isLandscape = orientation == Orientation.landscape;
+
+            return Stack(
+              children: [
+                Positioned.fill(
+                  child: CustomPaint(
+                    painter: PerspectiveCourtPainter(
+                      ballX: ballX,
+                      ballY: ballY,
+                      ballHeight: ballHeight,
+                      playerX: playerX,
+                      playerY: playerY,
+                      opponentX: opponentX,
+                      opponentY: opponentY,
+                      orbX: orbX,
+                      orbY: orbY,
+                      orbType: orbType,
+                      isDoublePointsActive: isDoublePointsActive,
+                      isAiShrunk: isAiShrunk,
+                      timingFeedback: timingFeedback,
+                      playerColor: widget.characterStyle.outfitPrimary,
+                      isUltimateActive: isUltimateActive,
+                      playerAnimState: playerAnimState,
+                      aiAnimState: aiAnimState,
+                      playerFrame: playerFrame,
+                      aiFrame: aiFrame,
+                      ballVx: game.ballVx,
+                      ballVy: game.ballVy,
+                      ballVz: game.ballVz,
+                      ballRotation: game.ballRotation,
+                      ballImpact: game.ballImpactTimer,
+                      trail: List.of(game.trail),
+                      animClock: game.animClock,
+                      playerWalkPhase: game.playerWalkPhase,
+                      aiWalkPhase: game.aiWalkPhase,
+                      playerMoveAmount: game.playerInputDir.distance
+                          .clamp(0.0, 1.0)
+                          .toDouble(),
+                      playerMoveX:
+                          game.playerInputDir.dx.clamp(-1.0, 1.0).toDouble(),
+                      aiMoveAmount: game.aiMoveAmount,
+                      aiMoveX: (game.aiVelX / 0.9).clamp(-1.0, 1.0).toDouble(),
+                      playerActionProgress: game.playerAnimProgress,
+                      aiActionProgress: game.aiAnimProgress,
+                      playerReach: game.playerReach,
+                      ballInReach: game.ballInPlayerReach,
+                      aimX: game.playerAimPreview.dx,
+                      aimY: game.playerAimPreview.dy,
+                      aimScatter: game.playerAimScatter,
+                      showAim: game.showAimPreview,
+                    ),
+                  ),
                 ),
-              ),
-            ),
-            Positioned.fill(
-              child: Opacity(
-                opacity: 0.01,
-                child: GameWidget(game: game),
-              ),
-            ),
-            // Header Bar
-            Positioned(
-              top: 12,
-              left: 12,
-              right: 12,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
+                Positioned.fill(
+                  child: Opacity(
+                    opacity: 0.01,
+                    child: GameWidget(game: game),
+                  ),
+                ),
+                // Header Bar
+                Positioned(
+                  top: 12,
+                  left: 12,
+                  right: 12,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      _buildHeaderIconButton(Icons.pause, _openPauseMenu),
-                      const SizedBox(width: 8),
-                      _buildHeaderIconButton(Icons.home, _openPauseMenu),
-                    ],
-                  ),
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF18181B),
-                      borderRadius: BorderRadius.circular(12),
-                      border:
-                          Border.all(color: const Color(0xFFFACC15), width: 2),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.radio,
-                            color: Color(0xFFFACC15), size: 20),
-                        const SizedBox(width: 8),
-                        Text(
-                          '$playerScore - $opponentScore',
-                          style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 20,
-                              fontWeight: FontWeight.w900),
+                      Row(
+                        children: [
+                          _buildHeaderIconButton(Icons.pause, _openPauseMenu),
+                          const SizedBox(width: 8),
+                          _buildHeaderIconButton(Icons.home, _openPauseMenu),
+                        ],
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF18181B),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                              color: const Color(0xFFFACC15), width: 2),
                         ),
-                      ],
-                    ),
-                  ),
-                  if (isDoublePointsActive)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                          color: const Color(0xFFEAB308),
-                          borderRadius: BorderRadius.circular(8)),
-                      child: const Text('  2X POINTS ACTIVE',
-                          style: TextStyle(
-                              color: Colors.black,
-                              fontWeight: FontWeight.w900,
-                              fontSize: 11)),
-                    )
-                  else
-                    const SizedBox(width: 40),
-                ],
-              ),
-            ),
-            // Status Banner
-            Positioned(
-              top: 68,
-              left: 0,
-              right: 0,
-              child: Center(
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.85),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.white24),
-                  ),
-                  child: Text(
-                    matchStatus,
-                    style: const TextStyle(
-                        color: Color(0xFFFACC15),
-                        fontSize: 12,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 1.0),
-                  ),
-                ),
-              ),
-            ),
-            if (!isGameOver) ...[
-              Positioned(
-                left: 24,
-                bottom: 24,
-                child: TouchJoystickWheel(
-                  onJoystickMoved: (Offset direction) {
-                    game.updatePlayerMovement(direction);
-                  },
-                ),
-              ),
-              Positioned(
-                right: 20,
-                bottom: 20,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    if (isPlayerServing)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: SizedBox(
-                          width: 130,
-                          height: 48,
-                          child: ElevatedButton.icon(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFFFACC15),
-                              foregroundColor: Colors.black,
-                              shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12)),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.radio,
+                                color: Color(0xFFFACC15), size: 20),
+                            const SizedBox(width: 8),
+                            Text(
+                              '$playerScore - $opponentScore',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 20,
+                                fontWeight: FontWeight.w900,
+                              ),
                             ),
-                            onPressed: () => game.triggerAttack('SERVE'),
-                            icon: const Icon(Icons.sports_tennis, size: 20),
-                            label: const Text('SERVE',
-                                style: TextStyle(fontWeight: FontWeight.w900)),
-                          ),
+                          ],
                         ),
                       ),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        _buildStreetButton(
-                            label: 'SLICE',
-                            onPressed: () => game.triggerAttack('ROLL')),
-                        const SizedBox(width: 12),
-                        _buildStreetButton(
-                            label: 'DRIVE',
-                            onPressed: () => game.triggerAttack('DRIVE'),
-                            isPrimary: true),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        _buildStreetButton(
-                            label: 'LOB',
-                            onPressed: () => game.triggerAttack('LOB')),
-                        const SizedBox(width: 12),
-                        _buildStreetButton(
-                            label: 'SMASH',
-                            onPressed: () => game.triggerAttack('SMASH')),
-                      ],
-                    ),
-                  ],
+                      if (isDoublePointsActive)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFEAB308),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Text('2X POINTS ACTIVE',
+                              style: TextStyle(
+                                color: Colors.black,
+                                fontWeight: FontWeight.w900,
+                                fontSize: 11,
+                              )),
+                        )
+                      else
+                        const SizedBox(width: 40),
+                    ],
+                  ),
                 ),
-              ),
-            ],
-          ],
+                // Status Banner
+                Positioned(
+                  top: isLandscape ? 56 : 68,
+                  left: 0,
+                  right: 0,
+                  child: Center(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.85),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.white24),
+                      ),
+                      child: Text(
+                        matchStatus,
+                        style: const TextStyle(
+                          color: Color(0xFFFACC15),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 1.0,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                if (!isGameOver) ...[
+                  // Dynamic Joystick Control Placement
+                  Positioned(
+                    left: isLandscape ? 36 : 24,
+                    bottom: isLandscape ? 20 : 24,
+                    child: TouchJoystickWheel(
+                      onJoystickMoved: (Offset direction) {
+                        game.updatePlayerMovement(direction);
+                      },
+                    ),
+                  ),
+                  // Dynamic Action Button Controls
+                  Positioned(
+                    right: isLandscape ? 36 : 20,
+                    bottom: isLandscape ? 16 : 20,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        if (isPlayerServing &&
+                            gameState == GameMatchState.ready)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: SizedBox(
+                              width: 130,
+                              height: 48,
+                              child: ElevatedButton.icon(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFFFACC15),
+                                  foregroundColor: Colors.black,
+                                  shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12)),
+                                ),
+                                onPressed: () => game.triggerAttack('SERVE'),
+                                icon: const Icon(Icons.sports_tennis, size: 20),
+                                label: const Text('SERVE',
+                                    style:
+                                        TextStyle(fontWeight: FontWeight.w900)),
+                              ),
+                            ),
+                          ),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            _buildStreetButton(
+                              label: 'SLICE',
+                              onPressed: () => game.triggerAttack('ROLL'),
+                            ),
+                            const SizedBox(width: 12),
+                            _buildStreetButton(
+                              label: 'DRIVE',
+                              onPressed: () => game.triggerAttack('DRIVE'),
+                              isPrimary: true,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            _buildStreetButton(
+                              label: 'LOB',
+                              onPressed: () => game.triggerAttack('LOB'),
+                            ),
+                            const SizedBox(width: 12),
+                            _buildStreetButton(
+                              label: 'SMASH',
+                              onPressed: () => game.triggerAttack('SMASH'),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
+            );
+          },
         ),
       ),
     );
@@ -613,7 +632,6 @@ class _TouchJoystickWheelState extends State<TouchJoystickWheel> {
   void _updatePosition(Offset offset) {
     final double distance = offset.distance;
     final double maxDistance = _baseRadius - _knobRadius;
-
     Offset clampedOffset = offset;
     if (distance > maxDistance) {
       clampedOffset = Offset(
@@ -621,11 +639,9 @@ class _TouchJoystickWheelState extends State<TouchJoystickWheel> {
         (offset.dy / distance) * maxDistance,
       );
     }
-
     setState(() {
       _dragPosition = clampedOffset;
     });
-
     final normalized = Offset(
       clampedOffset.dx / maxDistance,
       clampedOffset.dy / maxDistance,
