@@ -70,22 +70,22 @@ class PickleballGame extends FlameGame {
   bool isGameOver = false;
   String matchStatus = 'STREET SERVE READY';
   String? timingFeedback;
-  RallyPhase phase = RallyPhase.readyToServe;
 
+  RallyPhase phase = RallyPhase.readyToServe;
   double ultimateGauge = 0.0;
   bool isUltimateActive = false;
 
   double ballX = 0.0;
-  double ballY = 0.85;
+  double ballY = 1.02;
   double ballHeight = 0.40;
   double ballVx = 0.0;
   double ballVy = 0.0;
   double ballVz = 0.0;
 
   double playerX = 0.0;
-  double playerY = 0.85;
+  double playerY = 1.05;
   double opponentX = 0.0;
-  double opponentY = -0.85;
+  double opponentY = -0.75;
 
   // Animation States
   CharacterAnimState playerAnimState = CharacterAnimState.idle;
@@ -95,14 +95,13 @@ class PickleballGame extends FlameGame {
   double playerAnimDuration = 0.4;
   double aiAnimDuration = 0.4;
 
-  // Continuous animation data (read by the painter every frame)
+  // Continuous animation data
   double animClock = 0.0;
   double playerWalkPhase = 0.0;
   double aiWalkPhase = 0.0;
   double aiVelX = 0.0;
   double aiVelY = 0.0;
 
-  /// 0 -> 1 while a hit animation plays, 1 when idle.
   double get playerAnimProgress => playerAnimTimer > 0
       ? (1.0 - playerAnimTimer / playerAnimDuration).clamp(0.0, 1.0).toDouble()
       : 1.0;
@@ -110,36 +109,18 @@ class PickleballGame extends FlameGame {
       ? (1.0 - aiAnimTimer / aiAnimDuration).clamp(0.0, 1.0).toDouble()
       : 1.0;
 
-  // ---------------------------------------------------------------
-  // AI DIFFICULTY  (aiDupr: 2.5 = Rookie, 4.0 = Pro Tour, 5.5 = Titan)
-  // Everything below scales smoothly with the rating.
-  // ---------------------------------------------------------------
-  /// 0.0 at Rookie -> 1.0 at Titan
+  // AI Difficulty scaling
   double get _aiSkill => ((aiDupr - 2.5) / 3.0).clamp(0.0, 1.0).toDouble();
-
-  /// Run speed. Rookie is slow, Titan is faster than the human player (1.4).
   double get _aiTopSpeed => 0.95 + (aiDupr - 2.5) * 0.20;
-
-  /// Seconds before the AI starts reacting to your shot.
   double get _aiReactTime =>
       (0.45 - (aiDupr - 2.5) * 0.12).clamp(0.08, 0.45).toDouble();
-
-  /// How far off its read of the ball's landing spot the AI is.
   double get _aiTrackError =>
       (0.30 - (aiDupr - 2.5) * 0.0867).clamp(0.04, 0.30).toDouble();
-
-  /// Paddle reach (the human's is ~0.36).
   double get _aiReach => 0.32 + (aiDupr - 2.5) * 0.04;
-
-  /// Chance of a routine unforced error (before pressure is added).
   double get _aiBaseMiss =>
       (0.22 - (aiDupr - 2.5) * 0.0667).clamp(0.02, 0.30).toDouble();
-
-  /// Chance the AI aims away from you instead of hitting randomly.
   double get _aiPlacement =>
       (0.15 + (aiDupr - 2.5) * 0.20).clamp(0.10, 0.80).toDouble();
-
-  /// Multiplier on shot flight time: >1 = slower shots (Rookie), <1 = faster (Titan).
   double get _aiShotTimeScale => 1.10 - (aiDupr - 2.5) * 0.0667;
 
   double get aiMoveAmount =>
@@ -147,10 +128,7 @@ class PickleballGame extends FlameGame {
           .clamp(0.0, 1.0)
           .toDouble();
 
-  // Player reach: the radius around the player the paddle can actually cover.
-  // A better-control paddle reaches slightly farther.
   double get playerReach => 0.30 + (paddle.control / 100.0) * 0.10;
-
   double _playerSwingCooldown = 0.0;
   bool get ballInPlayerReach =>
       phase != RallyPhase.readyToServe &&
@@ -158,7 +136,6 @@ class PickleballGame extends FlameGame {
       sqrt(pow(ballX - playerX, 2) + pow(ballY - playerY, 2)) <= playerReach &&
       ballHeight <= 1.20;
 
-  // AI "brain"
   double _aiReactTimer = 0.0;
   double _aiAimErrX = 0.0;
   String _aiLastShot = 'DRIVE';
@@ -181,46 +158,27 @@ class PickleballGame extends FlameGame {
   double _aiServeTimer = 0.0;
   int _bounceCount = 0;
 
-  // Match Breakdown Stat Trackers
+  // Match Stat Trackers
   int smashesLanded = 0;
   int longestRally = 0;
   int kitchenFaults = 0;
   int _currentRallyHits = 0;
 
-  // ---------------------------------------------------------------
-  // BALL PHYSICS TUNING  (change these to adjust the feel)
-  // ---------------------------------------------------------------
-  /// Downward pull. Higher = ball drops faster, arcs are lower/snappier.
+  // Ball Physics Tuning
   static const double gravity = 8.0;
-
-  /// Air resistance (wiffle-style ball). Higher = ball slows down more in flight.
   static const double airDrag = 0.35;
-
-  /// How much vertical speed is kept on a bounce (1.0 = perfectly bouncy).
   static const double bounceRestitution = 0.66;
-
-  /// How much sideways/forward speed is kept on a bounce (court friction).
   static const double bounceFriction = 0.82;
-
-  /// How strongly spin bends the arc (topspin dips, backspin floats).
   static const double spinMagnus = 0.5;
-
-  /// Net height in "ball height" units (the painter draws the net to match).
   static const double netHeight = 0.55;
-
-  /// Shots are auto-lifted until they clear the net by at least this much.
   static const double netClearance = 0.08;
-
-  /// Fixed physics sub-step so the ball behaves the same at any frame rate.
   static const double _physicsStep = 1 / 120;
 
-  // Ball state used by physics + visuals
-  double ballSpin = 0.0; // +topspin, -backspin
-  double _gEff = gravity; // gravity + spin (Magnus) pull for the current shot
+  double ballSpin = 0.0;
+  double _gEff = gravity;
   double ballRotation = 0.0;
-  double ballImpactTimer = 0.0; // squash timer (hit / bounce)
+  double ballImpactTimer = 0.0;
   final List<BallTrailPoint> trail = [];
-
   bool _lastHitByPlayer = true;
   bool _isServeInFlight = false;
 
@@ -262,10 +220,18 @@ class PickleballGame extends FlameGame {
     orbType = null;
     _aiShrinkTimer = 0.0;
 
-    playerX = 0.0;
-    playerY = 0.85;
-    opponentX = 0.0;
-    opponentY = -0.85;
+    // Server stands behind baseline, Receiver stands inside court
+    if (isPlayerServing) {
+      playerX = 0.0;
+      playerY = 1.05; // Player outside baseline (Serving)
+      opponentX = 0.0;
+      opponentY = -0.75; // AI inside court (Receiving)
+    } else {
+      playerX = 0.0;
+      playerY = 0.75; // Player inside court (Receiving)
+      opponentX = 0.0;
+      opponentY = -1.05; // AI outside baseline (Serving)
+    }
 
     playerAnimState = CharacterAnimState.idle;
     aiAnimState = CharacterAnimState.idle;
@@ -274,7 +240,6 @@ class PickleballGame extends FlameGame {
     ballVx = 0.0;
     ballVy = 0.0;
     ballVz = 0.0;
-
     matchStatus = isPlayerServing ? 'YOUR SERVE' : 'AI SERVING...';
     _notifyState();
   }
@@ -295,16 +260,7 @@ class PickleballGame extends FlameGame {
     playerInputDir = dir;
   }
 
-  // ---------------- Player aiming ----------------
-  // The joystick doubles as the aim stick when you hit:
-  //   left / right = send the ball to that side
-  //   up           = deeper (toward the baseline)
-  //   down         = shorter (drops closer to the net)
-  // No stick input = roughly down the middle with a little scatter.
-
-  /// Shot scatter in court units: better-control paddles are more accurate.
   double get _aimScatter => 0.12 * (1.25 - paddle.control / 100.0);
-
   bool get _isAimingSideways => playerInputDir.dx.abs() > 0.25;
   double get _aimSideTarget =>
       playerInputDir.dx.sign * (0.35 + 0.5 * playerInputDir.dx.abs());
@@ -325,20 +281,17 @@ class PickleballGame extends FlameGame {
         .toDouble();
   }
 
-  /// Applies stick up/down to a shot's landing depth (opponent side is -Y).
   double _playerAimDepth(String shotType, double baseY) {
     final double dy = playerInputDir.dy;
     if (dy.abs() < 0.35) return baseY;
     final bool isDink = shotType == 'ROLL' || shotType == 'SLICE';
     if (isDink) {
-      // Dinks must stay in the kitchen: only fine-tune them.
       return (baseY + dy * 0.06).clamp(-0.36, -0.20).toDouble();
     }
     final double range = shotType == 'LOB' ? 0.06 : 0.20;
     return (baseY + dy * range).clamp(-0.92, -0.35).toDouble();
   }
 
-  /// Where the next shot is headed (drawn as a reticle on the court).
   Offset get playerAimPreview {
     if (phase == RallyPhase.readyToServe) {
       final double sx = _isAimingSideways
@@ -352,7 +305,6 @@ class PickleballGame extends FlameGame {
   }
 
   double get playerAimScatter => _isAimingSideways ? _aimScatter : 0.15;
-
   bool get showAimPreview =>
       !isGameOver &&
       ((phase == RallyPhase.readyToServe && isPlayerServing) ||
@@ -364,13 +316,9 @@ class PickleballGame extends FlameGame {
       _executePlayerServe();
       return;
     }
-
-    // Can't swing again until the last swing is mostly done (no button-mashing)
     if (_playerSwingCooldown > 0) return;
 
     final CharacterAnimState swingAnim = _animStateForShot(shotType);
-
-    // Only a ball coming toward you (not your own shot) can be hit
     final bool ballIsHittable =
         phase != RallyPhase.readyToServe && !_lastHitByPlayer && ballY > -0.05;
 
@@ -398,7 +346,6 @@ class PickleballGame extends FlameGame {
       }
     }
 
-    // Whiff: the player still swings, but the ball is untouched
     _startPlayerAnim(swingAnim);
     _playerSwingCooldown = playerAnimDuration * 0.7;
     if (failText != null) {
@@ -451,13 +398,20 @@ class PickleballGame extends FlameGame {
     aiAnimTimer = aiAnimDuration;
   }
 
-  /// Called whenever the human hits/serves: the AI needs a moment to react.
   void _onPlayerShot() {
     _aiReactTimer = _aiReactTime;
     _aiAimErrX = (_rng.nextDouble() - 0.5) * 2.0 * _aiTrackError;
   }
 
   void _executePlayerServe() {
+    // Foot fault check: Player must serve from behind baseline (Y >= 1.0)
+    if (playerY < 1.0) {
+      matchStatus = 'FOOT FAULT! SERVED INSIDE COURT';
+      AudioService.playFaultSfx();
+      _awardPointToOpponent();
+      return;
+    }
+
     phase = RallyPhase.inFlight;
     _bounceCount = 0;
     _currentRallyHits = 1;
@@ -476,10 +430,8 @@ class PickleballGame extends FlameGame {
       airTime: 0.95,
       spin: 0.0,
     );
-
     _startPlayerAnim(CharacterAnimState.serving);
     _onPlayerShot();
-
     matchStatus = 'SERVE IN PLAY';
     timingFeedback = 'STREET SERVE!';
     AudioService.playShotSfx('DRIVE');
@@ -487,7 +439,6 @@ class PickleballGame extends FlameGame {
   }
 
   void _executePlayerHit(String shotType) {
-    // Kitchen fault = volleying while standing in the kitchen
     if (playerY < 0.32 && ballHeight > 0.20 && _bounceCount == 0) {
       kitchenFaults++;
       _currentRallyHits = 0;
@@ -509,17 +460,14 @@ class PickleballGame extends FlameGame {
 
     _lastHitByPlayer = true;
     _isServeInFlight = false;
-
     if (!isUltimateActive) {
       ultimateGauge = (ultimateGauge + 0.20).clamp(0.0, 1.0);
     }
 
-    // Aim: hold the stick left/right (side) and up/down (deeper/shorter)
-    // when you hit. Sloppier paddles scatter the shot a little more.
     double targetX = _playerAimX();
     double targetY = -0.72;
     double airTime = 0.80;
-    double spin = 0.35; // + topspin, - backspin
+    double spin = 0.35;
 
     if (shotType == 'ULTIMATE' || isUltimateActive) {
       isUltimateActive = true;
@@ -548,14 +496,14 @@ class PickleballGame extends FlameGame {
         case 'ROLL':
           targetY = -0.28;
           airTime = 0.85;
-          spin = 0.9; // heavy topspin: arcs up, dips fast, kicks forward
+          spin = 0.9;
           playerAnimState = CharacterAnimState.slice;
           timingFeedback = 'ALLEY DINK!';
           break;
         case 'SLICE':
           targetY = -0.28;
           airTime = 0.85;
-          spin = -0.8; // backspin: floats, dies on the bounce
+          spin = -0.8;
           playerAnimState = CharacterAnimState.slice;
           timingFeedback = 'ALLEY DINK!';
           break;
@@ -578,10 +526,8 @@ class PickleballGame extends FlameGame {
       AudioService.playShotSfx(shotType);
     }
 
-    // Paddle stats: power = faster shots, spin = more spin.
     airTime /= (1.0 + (paddle.power - 45) / 250.0);
     spin *= (paddle.spin / 60.0);
-
     targetY = _playerAimDepth(shotType, targetY);
 
     _startPlayerAnim(playerAnimState);
@@ -594,14 +540,10 @@ class PickleballGame extends FlameGame {
       airTime: airTime,
       spin: spin,
     );
-
     matchStatus = 'RALLY IN PROGRESS';
     _clearTimingFeedback();
   }
 
-  /// Launches the ball from its current position so that, with drag and spin
-  /// included, it lands on ([targetX], [targetY]) after [airTime] seconds.
-  /// If the arc would clip the net, the flight is lengthened until it clears.
   void _launchBall({
     required double targetX,
     required double targetY,
@@ -630,13 +572,13 @@ class PickleballGame extends FlameGame {
 
       final double arg = 1.0 + ballY * k / vy;
       if (arg <= 0) break;
-      final double tn = -log(arg) / k; // time the ball reaches the net
+      final double tn = -log(arg) / k;
       final double hn = ballHeight +
           (vz + gEff / k) * (1.0 - exp(-k * tn)) / k -
           gEff * tn / k;
 
       if (hn >= netHeight + netClearance) break;
-      t += 0.05; // arc too flat: give it more air time
+      t += 0.05;
     }
 
     ballVx = vx;
@@ -664,16 +606,21 @@ class PickleballGame extends FlameGame {
 
     if (_aiShrinkTimer > 0) _aiShrinkTimer -= dt;
     animClock += dt;
-
     if (_playerSwingCooldown > 0) _playerSwingCooldown -= dt;
 
-    // Player Movement & Animation Cycle
     double moveSpeed = 1.4 * characterStyle.speedMultiplier;
     if (playerInputDir != Offset.zero) {
       playerX =
           (playerX + playerInputDir.dx * moveSpeed * dt).clamp(-0.92, 0.92);
-      playerY =
-          (playerY + playerInputDir.dy * moveSpeed * dt).clamp(0.20, 0.92);
+
+      // Only restrict player Y movement behind baseline IF the player is serving
+      if (phase == RallyPhase.readyToServe && isPlayerServing) {
+        playerY =
+            (playerY + playerInputDir.dy * moveSpeed * dt).clamp(1.02, 1.15);
+      } else {
+        playerY =
+            (playerY + playerInputDir.dy * moveSpeed * dt).clamp(0.20, 1.10);
+      }
 
       if (playerAnimTimer <= 0) {
         if (playerInputDir.dy < -0.3) {
@@ -701,7 +648,6 @@ class PickleballGame extends FlameGame {
     if (playerAnimTimer > 0) playerAnimTimer -= dt;
     if (aiAnimTimer > 0) aiAnimTimer -= dt;
 
-    // Power Orb Spawning
     if (phase == RallyPhase.activeRally && orbX == null) {
       _orbSpawnTimer += dt;
       if (_orbSpawnTimer > 4.0) {
@@ -712,7 +658,6 @@ class PickleballGame extends FlameGame {
       }
     }
 
-    // AI Serve Trigger
     if (phase == RallyPhase.readyToServe && !isPlayerServing) {
       _aiServeTimer += dt;
       if (_aiServeTimer > 1.0) {
@@ -721,13 +666,12 @@ class PickleballGame extends FlameGame {
       }
     }
 
-    // Ball Dynamics (fixed sub-steps => same feel at any frame rate)
     if (phase != RallyPhase.readyToServe) {
       double remaining = min(dt, 0.05);
       while (remaining > 0) {
         final double step = min(remaining, _physicsStep);
         remaining -= step;
-        if (!_stepBall(step)) return; // rally ended, state already reset
+        if (!_stepBall(step)) return;
       }
 
       _updateAiBehavior(dt);
@@ -737,7 +681,6 @@ class PickleballGame extends FlameGame {
         _recordTrail();
         final double speed = sqrt(ballVx * ballVx + ballVy * ballVy);
         ballRotation += (2.0 + ballSpin * 16.0 + speed * 3.0) * dt;
-
         if (ballY > 1.10) {
           matchStatus = 'POINT TO AI!';
           AudioService.playFaultSfx();
@@ -749,7 +692,6 @@ class PickleballGame extends FlameGame {
     }
 
     if (ballImpactTimer > 0) ballImpactTimer -= dt;
-
     _notifyState();
   }
 
@@ -758,22 +700,18 @@ class PickleballGame extends FlameGame {
     if (trail.length > 9) trail.removeAt(0);
   }
 
-  /// Advances the ball by [dt]. Returns false if the rally ended this step.
   bool _stepBall(double dt) {
     const double k = airDrag;
     final double f = exp(-k * dt);
     final double prevY = ballY;
 
-    // Exact exponential-drag integration over this step.
     ballX += ballVx * (1.0 - f) / k;
     ballY += ballVy * (1.0 - f) / k;
     ballHeight += (ballVz + _gEff / k) * (1.0 - f) / k - _gEff * dt / k;
-
     ballVx *= f;
     ballVy *= f;
     ballVz = ballVz * f - _gEff * (1.0 - f) / k;
 
-    // Net: the ball must pass over it
     if (prevY * ballY < 0 && ballHeight < netHeight) {
       if (_lastHitByPlayer) {
         matchStatus = 'NET! POINT TO AI';
@@ -787,7 +725,6 @@ class PickleballGame extends FlameGame {
       return false;
     }
 
-    // Power orb pickup
     if (orbX != null && orbY != null) {
       final double distToOrb =
           sqrt(pow(ballX - orbX!, 2) + pow(ballY - orbY!, 2));
@@ -799,7 +736,6 @@ class PickleballGame extends FlameGame {
       }
     }
 
-    // Bounce
     if (ballHeight <= 0.0 && ballVz < 0) {
       ballHeight = 0.0;
       _bounceCount++;
@@ -807,9 +743,7 @@ class PickleballGame extends FlameGame {
 
       if (_bounceCount == 1) {
         final bool outOfBounds = ballX.abs() > 1.02 || ballY.abs() > 1.02;
-        // A shot must land on the OTHER side of the net
         final bool wrongSide = _lastHitByPlayer ? ballY > 0.0 : ballY < 0.0;
-        // A serve must clear the kitchen
         final bool shortServe = _isServeInFlight && ballY.abs() < 0.32;
 
         if (outOfBounds || wrongSide || shortServe) {
@@ -833,7 +767,6 @@ class PickleballGame extends FlameGame {
           return false;
         }
       } else {
-        // Only ONE bounce is allowed per side
         if (ballY > 0) {
           matchStatus = 'DOUBLE BOUNCE! POINT TO AI';
           AudioService.playFaultSfx();
@@ -846,8 +779,6 @@ class PickleballGame extends FlameGame {
         return false;
       }
 
-      // Legal bounce: spin changes how the ball comes off the court.
-      // Topspin = lower bounce + kicks forward. Backspin = higher, grabs and slows.
       final double s = ballSpin;
       final double vertKeep =
           (bounceRestitution * (1.0 - 0.18 * s)).clamp(0.35, 0.85).toDouble();
@@ -860,7 +791,6 @@ class PickleballGame extends FlameGame {
       _gEff = gravity + (_gEff - gravity) * 0.4;
       ballSpin *= 0.4;
     }
-
     return true;
   }
 
@@ -885,6 +815,8 @@ class PickleballGame extends FlameGame {
   }
 
   void _executeAiServe() {
+    opponentY = -1.05; // Outside baseline during AI serve
+
     phase = RallyPhase.inFlight;
     _bounceCount = 0;
     _currentRallyHits = 1;
@@ -903,38 +835,32 @@ class PickleballGame extends FlameGame {
       airTime: 0.95,
       spin: 0.0,
     );
-
     _startAiAnim(CharacterAnimState.serving);
     matchStatus = 'AI SERVED - RETURN IT!';
     AudioService.playShotSfx('DRIVE');
   }
 
-  /// Where the AI wants to stand when it has nothing urgent to do.
   double _aiHomeY() {
     final double s = _aiSkill;
     double lerp(double a, double b) => a + (b - a) * s;
     switch (_aiLastShot) {
       case 'DINK':
-        return -lerp(
-            0.50, 0.38); // followed its dink in: crowd the kitchen line
+        return -lerp(0.50, 0.38);
       case 'LOB':
-        return -0.82; // hit a lob: drop back
+        return -0.82;
       case 'SMASH':
         return -lerp(0.58, 0.44);
       case 'SPEED_UP':
         return -lerp(0.62, 0.46);
       default:
-        // Rookie hangs back; Titan camps near the kitchen line
         return playerY < 0.50 ? -lerp(0.58, 0.42) : -lerp(0.74, 0.48);
     }
   }
 
-  /// Simulates the ball forward (same physics) to find its first bounce.
   List<double> _predictLanding() {
     const double k = airDrag;
     const double dt = 1 / 60;
     final double f = exp(-k * dt);
-
     double x = ballX, y = ballY, h = ballHeight;
     double vx = ballVx, vy = ballVy, vz = ballVz;
 
@@ -945,7 +871,6 @@ class PickleballGame extends FlameGame {
       vx *= f;
       vy *= f;
       vz = vz * f - _gEff * (1.0 - f) / k;
-
       if (h <= 0 && vz < 0) break;
     }
     return [x, y];
@@ -954,41 +879,33 @@ class PickleballGame extends FlameGame {
   void _updateAiBehavior(double dt) {
     final double aiSpeed = _aiTopSpeed;
     if (_aiReactTimer > 0) _aiReactTimer -= dt;
-
     final double incomingSpeed = sqrt(ballVx * ballVx + ballVy * ballVy);
 
-    // ---- 1. Decide where to stand (both axes) ----
     double targetX = opponentX;
     double targetY = _aiHomeY();
 
     if (ballVy < 0) {
       if (_aiReactTimer > 0) {
-        // Still reading the shot: drift toward the middle
         targetX = 0.0;
       } else if (_bounceCount == 0) {
-        // Ball still in the air: get to where it will land, a step behind it,
-        // so short balls pull the AI forward and deep balls push it back.
         final List<double> land = _predictLanding();
         targetX = land[0] + _aiAimErrX;
         targetY = (land[1] - (0.08 + 0.09 * incomingSpeed))
             .clamp(-0.92, -0.34)
             .toDouble();
       } else {
-        // Ball has bounced: chase it, even into the kitchen (legal after a bounce)
         targetX = ballX + ballVx * 0.20 + _aiAimErrX * 0.3;
         targetY = (ballY + ballVy * 0.20).clamp(-0.92, -0.14).toDouble();
       }
     } else {
-      // Ball heading to the player: recover toward the middle
       targetX = playerX * 0.35;
     }
 
-    // ---- 2. Move with acceleration (smooth, not instant) ----
     final double dx = targetX - opponentX;
     final double dy = targetY - opponentY;
     final double dist = sqrt(dx * dx + dy * dy);
-
     double wantVx = 0.0, wantVy = 0.0;
+
     if (dist > 0.03) {
       final double sp = min(aiSpeed, dist / 0.12);
       wantVx = dx / dist * sp;
@@ -998,11 +915,9 @@ class PickleballGame extends FlameGame {
     final double ease = min(1.0, 10.0 * dt);
     aiVelX += (wantVx - aiVelX) * ease;
     aiVelY += (wantVy - aiVelY) * ease;
-
     opponentX = (opponentX + aiVelX * dt).clamp(-0.92, 0.92).toDouble();
-    opponentY = (opponentY + aiVelY * dt).clamp(-0.92, -0.10).toDouble();
+    opponentY = (opponentY + aiVelY * dt).clamp(-1.05, -0.10).toDouble();
 
-    // ---- 3. Run animation (direction + speed based) ----
     final double moveAmt = aiMoveAmount;
     if (aiAnimTimer <= 0) {
       if (moveAmt > 0.08) {
@@ -1027,9 +942,6 @@ class PickleballGame extends FlameGame {
       }
     }
 
-    // ---- 4. Hit detection: real 2D reach, not just left/right ----
-    // The AI plays off the bounce, and only volleys when it is up at the net.
-    // Only Rookies are careless enough to volley from inside the kitchen.
     final bool kitchenOk = opponentY <= -0.34 || aiDupr < 3.0;
     final bool canVolley = kitchenOk && opponentY > -0.55 && ballHeight < 0.80;
 
@@ -1039,7 +951,6 @@ class PickleballGame extends FlameGame {
         (_bounceCount >= 1 || canVolley)) {
       double reach = _aiReach;
       if (_aiShrinkTimer > 0) reach *= 0.50;
-
       final double d =
           sqrt(pow(ballX - opponentX, 2) + pow(ballY - opponentY, 2));
       if (d <= reach) {
@@ -1056,7 +967,6 @@ class PickleballGame extends FlameGame {
   }
 
   void _aiExecuteHit(double dist, double reach, double incomingSpeed) {
-    // Volleying from inside the kitchen is a fault
     if (opponentY > -0.32 && _bounceCount == 0 && ballHeight > 0.15) {
       matchStatus = 'AI KITCHEN FAULT! YOUR POINT';
       AudioService.playFaultSfx();
@@ -1075,17 +985,15 @@ class PickleballGame extends FlameGame {
     _lastHitByPlayer = false;
     _isServeInFlight = false;
 
-    // ---- Can the AI make a clean shot? Harder balls / stretched = more errors
     final double pressure =
         ((incomingSpeed - 1.6) / 1.6).clamp(0.0, 1.0).toDouble();
-    final double stretch = aiMoveAmount; // running flat-out = harder to control
+    final double stretch = aiMoveAmount;
     final double baseMiss = _aiBaseMiss;
     final double missChance =
         (baseMiss + 0.14 * pressure + 0.14 * stretch * stretch)
             .clamp(0.0, 0.75)
             .toDouble();
 
-    // ---- Shot selection (varies with situation and skill) ----
     final double r = _rng.nextDouble();
     final bool nearNet = opponentY > -0.50;
     final bool highBall = ballHeight > 0.60;
@@ -1095,7 +1003,7 @@ class PickleballGame extends FlameGame {
     if (highBall && (aiDupr >= 3.0 || r < 0.5)) {
       shot = 'SMASH';
     } else if (nearNet) {
-      final double dinkP = 0.35 + 0.40 * _aiSkill; // Titan dinks the most
+      final double dinkP = 0.35 + 0.40 * _aiSkill;
       shot = r < dinkP ? 'DINK' : (r < 0.85 ? 'DRIVE' : 'SPEED_UP');
     } else if (playerAtNet && r < 0.35) {
       shot = 'LOB';
@@ -1107,7 +1015,6 @@ class PickleballGame extends FlameGame {
       shot = 'DRIVE';
     }
 
-    // ---- Placement: better players aim away from you ----
     double targetX;
     if (_rng.nextDouble() < _aiPlacement) {
       final double away =
@@ -1151,25 +1058,23 @@ class PickleballGame extends FlameGame {
         break;
     }
 
-    airTime *= _aiShotTimeScale; // Rookie = slower shots, Titan = faster
+    airTime *= _aiShotTimeScale;
 
-    // ---- Unforced error: hits long, wide, or into the net ----
     bool netError = false;
     if (_rng.nextDouble() < missChance) {
       final int kind = _rng.nextInt(3);
       if (kind == 0) {
-        targetY = 1.12 + _rng.nextDouble() * 0.10; // long
+        targetY = 1.12 + _rng.nextDouble() * 0.10;
       } else if (kind == 1) {
-        targetX = (targetX >= 0 ? 1.0 : -1.0) *
-            (1.12 + _rng.nextDouble() * 0.12); // wide
+        targetX =
+            (targetX >= 0 ? 1.0 : -1.0) * (1.12 + _rng.nextDouble() * 0.12);
       } else {
-        netError = true; // too flat
+        netError = true;
       }
     }
 
     _startAiAnim(anim);
     _aiLastShot = shot;
-
     _launchBall(
       targetX: targetX,
       targetY: targetY,
@@ -1179,7 +1084,6 @@ class PickleballGame extends FlameGame {
     );
 
     if (netError) ballVz *= 0.45;
-
     matchStatus = 'RALLY IN PROGRESS';
     AudioService.playShotSfx(shot == 'SMASH' ? 'SMASH' : 'DRIVE');
   }
@@ -1188,7 +1092,6 @@ class PickleballGame extends FlameGame {
     int pointsEarned = isDoublePointsActive ? 2 : 1;
     playerScore += pointsEarned;
     isDoublePointsActive = false;
-
     if (playerScore >= targetScore && (playerScore - opponentScore) >= 2) {
       isGameOver = true;
       matchStatus = 'MATCH OVER! YOU WIN!';
@@ -1202,7 +1105,6 @@ class PickleballGame extends FlameGame {
     int pointsEarned = isDoublePointsActive ? 2 : 1;
     opponentScore += pointsEarned;
     isDoublePointsActive = false;
-
     if (opponentScore >= targetScore && (opponentScore - playerScore) >= 2) {
       isGameOver = true;
       matchStatus = 'MATCH OVER! AI WINS!';
