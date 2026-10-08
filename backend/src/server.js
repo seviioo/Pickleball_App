@@ -340,8 +340,10 @@ function broadcastToRoom(roomCode, message, excludedSocket = null) {
     if (socket !== excludedSocket && socket.readyState === 1) {
       socket.send(encoded);
     }
+  }
+}
 
-    const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 
     function createMatchState(room) {
       const hostId = room.players[0].playerId.toString();
@@ -520,21 +522,21 @@ function broadcastToRoom(roomCode, message, excludedSocket = null) {
       };
     }
 
-    setInterval(() => {
-      const now = Date.now();
-      for (const state of matchStates.values()) {
-        const dt = Math.min((now - state.lastTick) / 1000, 0.05);
-        state.lastTick = now;
-        updateMatchState(state, dt);
-        state.sequence += 1;
-        const sockets = socketsByRoom.get(state.roomCode) || [];
-        for (const socket of sockets) {
-          if (socket.readyState === 1) socket.send(JSON.stringify(snapshotFor(state, socket.clientId)));
-        }
+setInterval(() => {
+  const now = Date.now();
+  for (const state of matchStates.values()) {
+    const dt = Math.min((now - state.lastTick) / 1000, 0.05);
+    state.lastTick = now;
+    updateMatchState(state, dt);
+    state.sequence += 1;
+    const sockets = socketsByRoom.get(state.roomCode) || [];
+    for (const socket of sockets) {
+      if (socket.readyState === 1) {
+        socket.send(JSON.stringify(snapshotFor(state, socket.clientId)));
       }
-    }, 50);
+    }
   }
-}
+}, 50);
 
 app.post('/api/players/:clientId/matches', asyncRoute(async (request, response) => {
   const { clientId } = request.params;

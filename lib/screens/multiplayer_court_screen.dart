@@ -110,11 +110,6 @@ class _MultiplayerCourtScreenState extends State<MultiplayerCourtScreen> {
   }
 
   void _onJoystickMove(Offset direction) {
-    setState(() {
-      myX = (myX + direction.dx * 0.03).clamp(-0.92, 0.92);
-      myY = (myY + direction.dy * 0.03).clamp(0.20, 1.10);
-    });
-
     SocketService.instance.sendEvent('MOVE', {
       'dx': direction.dx,
       'dy': direction.dy,
