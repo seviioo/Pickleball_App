@@ -1,11 +1,16 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import '../models/game_models.dart';
+import '../services/api_service.dart';
 import '../services/storage_service.dart';
 import '../theme/app_theme.dart';
 import 'lobby_screen.dart';
 
 class WelcomeScreen extends StatefulWidget {
-  const WelcomeScreen({super.key});
+  final bool isOffline;
+
+  const WelcomeScreen({super.key, this.isOffline = false});
 
   @override
   State<WelcomeScreen> createState() => _WelcomeScreenState();
@@ -34,7 +39,6 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
         ? 'Player 1'
         : _nameController.text.trim();
     await StorageService.saveUserName(name);
-
     if (!mounted) return;
 
     Navigator.pushReplacement(
@@ -43,9 +47,17 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
         builder: (context) => LobbyScreen(
           userName: name,
           characterStyle: kCharacterStyles[0],
+          isOffline: widget.isOffline,
         ),
       ),
     );
+
+    if (!widget.isOffline) {
+      unawaited(ApiService.syncPlayer(displayName: name).catchError((error) {
+        debugPrint('Player sync unavailable: $error');
+      }));
+    }
+
   }
 
   @override

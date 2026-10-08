@@ -11,12 +11,14 @@ import 'tournament_screen.dart';
 class LobbyScreen extends StatefulWidget {
   final String userName;
   final CharacterStyleData characterStyle;
+  final bool isOffline;
 
   const LobbyScreen({
-    Key? key,
+    super.key,
     required this.userName,
     required this.characterStyle,
-  }) : super(key: key);
+    this.isOffline = false,
+  });
 
   @override
   State<LobbyScreen> createState() => _LobbyScreenState();
@@ -118,6 +120,39 @@ class _LobbyScreenState extends State<LobbyScreen> {
                   ),
                 ],
               ),
+              if (widget.isOffline) ...[
+                const SizedBox(height: 12),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.amberAccent.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: Colors.amberAccent.withOpacity(0.45),
+                    ),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.cloud_off, color: Colors.amberAccent),
+                      SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'OFFLINE MODE: progress is saved on this device.',
+                          style: TextStyle(
+                            color: Colors.amberAccent,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
               const SizedBox(height: 20),
               // Stats Row
               Row(

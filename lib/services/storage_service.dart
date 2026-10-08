@@ -1,18 +1,35 @@
+import 'dart:convert';
+
+import 'package:crypto/crypto.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/game_models.dart';
 
 class StorageService {
+  static const String _keyClientId = 'api_client_id';
   static const String _keyCoins = 'user_coins';
   static const String _keyXp = 'user_xp';
   static const String _keyWins = 'user_wins';
   static const String _keyLosses = 'user_losses';
   static const String _keyUserName = 'user_name';
+  static const String _keyRegistered = 'account_registered';
+  static const String _keyPasswordHash = 'account_password_hash';
   static const String _keyEquippedPaddle = 'equipped_paddle_id';
   static const String _keyUnlockedPaddles = 'unlocked_paddles';
   static const String _keyLastDailyClaim = 'last_daily_claim';
   static const String _keyTournamentRound = 'tournament_round';
   static const String _keySoundEnabled = 'sound_enabled';
   static const String _keyHapticsEnabled = 'haptics_enabled';
+
+  static Future<String> getOrCreateClientId() async {
+    final prefs = await SharedPreferences.getInstance();
+    final existingId = prefs.getString(_keyClientId);
+    if (existingId != null && existingId.isNotEmpty) return existingId;
+
+    final clientId =
+        'device_${DateTime.now().microsecondsSinceEpoch}_${DateTime.now().millisecondsSinceEpoch}';
+    await prefs.setString(_keyClientId, clientId);
+    return clientId;
+  }
 
   // Audio & Haptics Settings
   static Future<bool> getSoundEnabled() async {
@@ -87,6 +104,34 @@ class StorageService {
   static Future<void> saveUserName(String name) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_keyUserName, name);
+  }
+
+  static Future<void> registerAccount({
+    required String username,
+    required String password,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_keyUserName, username);
+    await prefs.setString(_keyPasswordHash, _hashPassword(password));
+    await prefs.setBool(_keyRegistered, true);
+  }
+
+  static Future<bool> verifyCredentials({
+    required String username,
+    required String password,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    final registered = prefs.getBool(_keyRegistered) ?? false;
+    final savedUsername = prefs.getString(_keyUserName) ?? '';
+    final savedPasswordHash = prefs.getString(_keyPasswordHash) ?? '';
+
+    return registered &&
+        savedUsername.toLowerCase() == username.toLowerCase() &&
+        savedPasswordHash == _hashPassword(password);
+  }
+
+  static String _hashPassword(String password) {
+    return sha256.convert(utf8.encode(password)).toString();
   }
 
   // Daily Stash Reward

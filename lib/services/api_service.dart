@@ -1,13 +1,13 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'storage_service.dart';
 
 class ApiService {
-  // Replace with your groupmate's server URL:
-  // - Localhost testing on Android Emulator: 'http://10.0.2.2:3000'
-  // - Localhost testing on Web/Desktop: 'http://localhost:3000'
-  // - Real Phone on same Wi-Fi: 'http://192.168.x.x:3000'
-  static String baseUrl = 'http://localhost:3000';
+  static const String baseUrl = String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: 'http://localhost:3000',
+  );
 
   // --- AUTHENTICATION ---
   static Future<Map<String, dynamic>?> register({
@@ -53,6 +53,18 @@ class ApiService {
       debugPrint('Login API Error: $e');
     }
     return null;
+  }
+
+  static Future<void> syncPlayer({required String displayName}) async {
+    final clientId = await StorageService.getOrCreateClientId();
+    final response = await http.put(
+      Uri.parse('$baseUrl/api/players/$clientId'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'displayName': displayName}),
+    );
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception('Player sync failed (${response.statusCode})');
+    }
   }
 
   // --- ROOM MANAGEMENT ---
@@ -111,17 +123,77 @@ class ApiService {
   }
 
   // --- LEADERBOARD ---
-  static Future<List<dynamic>> getLeaderboard() async {
+  static Future<List<Map<String, dynamic>>> getLeaderboard() async {
     try {
       final response = await http.get(Uri.parse('$baseUrl/api/leaderboard'));
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        return data is List ? data : (data['leaderboard'] ?? []);
+        final players = data is List ? data : (data['players'] ?? data['leaderboard'] ?? []);
+        return players
+            .map((player) => Map<String, dynamic>.from(player as Map))
+            .toList();
       }
     } catch (e) {
       debugPrint('Leaderboard API Error: $e');
     }
-    return [];
+    return <Map<String, dynamic>>[];
+  }
+
+  static Future<List<Map<String, dynamic>>> getMatchHistory() async {
+    final clientId = await StorageService.getOrCreateClientId();
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/api/players/$clientId/matches'),
+      );
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        return (data['matches'] as List<dynamic>)
+            .map((match) => Map<String, dynamic>.from(match as Map))
+            .toList();
+      }
+    } catch (e) {
+      debugPrint('Match history API Error: $e');
+    }
+    return <Map<String, dynamic>>[];
+  }
+
+  static Future<void> submitMatch({
+    required bool isVictory,
+    required int playerScore,
+    required int opponentScore,
+    required String opponentName,
+    required int coinsEarned,
+    required int xpEarned,
+    required int kitchenFaults,
+    required int smashesLanded,
+    required int longestRally,
+    required bool isTournamentMatch,
+    required int tournamentRound,
+    required String idempotencyKey,
+  }) async {
+    final clientId = await StorageService.getOrCreateClientId();
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/players/$clientId/matches'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'idempotencyKey': idempotencyKey,
+        'mode': 'solo',
+        'isVictory': isVictory,
+        'playerScore': playerScore,
+        'opponentScore': opponentScore,
+        'opponentName': opponentName,
+        'coinsEarned': coinsEarned,
+        'xpEarned': xpEarned,
+        'kitchenFaults': kitchenFaults,
+        'smashesLanded': smashesLanded,
+        'longestRally': longestRally,
+        'isTournamentMatch': isTournamentMatch,
+        'tournamentRound': tournamentRound,
+      }),
+    );
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception('Match submission failed (${response.statusCode})');
+    }
   }
 
   // --- MATCH RESULT SUBMISSION ---

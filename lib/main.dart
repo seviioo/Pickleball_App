@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'screens/login_screen.dart';
@@ -15,8 +17,8 @@ void main() async {
     DeviceOrientation.landscapeRight,
   ]);
 
-  // Preload audio assets and sound effects
-  await AudioService.init();
+  // Preload audio without delaying the first screen.
+  unawaited(AudioService.init());
 
   runApp(const PickleballApp());
 }

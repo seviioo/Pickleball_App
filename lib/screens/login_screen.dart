@@ -5,6 +5,7 @@ import '../services/storage_service.dart';
 import '../theme/app_theme.dart';
 import 'lobby_screen.dart';
 import 'signup_screen.dart';
+import 'welcome_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -59,6 +60,15 @@ class _LoginScreenState extends State<LoginScreen> {
             'Incorrect username or password. Please try again or create a profile.',
       );
     }
+  }
+
+  void _playOffline() {
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const WelcomeScreen(isOffline: true),
+      ),
+    );
   }
 
   void _showAccountNotFoundDialog(
@@ -178,6 +188,15 @@ class _LoginScreenState extends State<LoginScreen> {
                                 fontSize: 13)),
                       ),
                     ],
+                  ),
+                  const SizedBox(height: 22),
+                  TextButton.icon(
+                    onPressed: _playOffline,
+                    icon: const Icon(Icons.cloud_off),
+                    label: const Text('PLAY OFFLINE'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppColors.textSecondary,
+                    ),
                   ),
                 ],
               ),

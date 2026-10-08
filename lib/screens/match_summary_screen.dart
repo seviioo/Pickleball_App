@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../services/api_service.dart';
 import '../services/storage_service.dart';
 
 class MatchSummaryScreen extends StatefulWidget {
@@ -47,10 +48,13 @@ class _MatchSummaryScreenState extends State<MatchSummaryScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _counterController;
   late Animation<double> _counterAnimation;
+  late final String _matchIdempotencyKey;
 
   @override
   void initState() {
     super.initState();
+    _matchIdempotencyKey =
+        'match_${DateTime.now().microsecondsSinceEpoch}';
     _counterController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1800),
@@ -420,9 +424,11 @@ class _MatchSummaryScreenState extends State<MatchSummaryScreen>
       height: 54,
       child: ElevatedButton(
         onPressed: () async {
+          var coinsToAward = 0;
+          var xpToAward = 0;
           if (isWin) {
-            int coinsToAward = widget.coinsEarned;
-            int xpToAward = widget.xpEarned;
+            coinsToAward = widget.coinsEarned;
+            xpToAward = widget.xpEarned;
 
             if (widget.isTournamentMatch) {
               final nextRound = widget.tournamentRound + 1;
@@ -443,6 +449,25 @@ class _MatchSummaryScreenState extends State<MatchSummaryScreen>
           } else {
             final currentLosses = await StorageService.getLosses();
             await StorageService.setLosses(currentLosses + 1);
+          }
+
+          try {
+            await ApiService.submitMatch(
+              isVictory: isWin,
+              playerScore: widget.playerScore,
+              opponentScore: widget.opponentScore,
+              opponentName: widget.opponentName,
+              coinsEarned: coinsToAward,
+              xpEarned: xpToAward,
+              kitchenFaults: widget.kitchenFaults,
+              smashesLanded: widget.smashesLanded,
+              longestRally: widget.longestRally,
+              isTournamentMatch: widget.isTournamentMatch,
+              tournamentRound: widget.tournamentRound,
+              idempotencyKey: _matchIdempotencyKey,
+            );
+          } catch (error) {
+            debugPrint('Match sync unavailable: $error');
           }
 
           if (!mounted) return;
