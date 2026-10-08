@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../models/game_models.dart';
+import '../services/api_service.dart';
+import '../services/socket_service.dart';
 import '../theme/app_theme.dart';
+import 'multiplayer_court_screen.dart';
 
 class MultiplayerLobbyScreen extends StatefulWidget {
   final String userName;
@@ -22,8 +25,51 @@ class MultiplayerLobbyScreen extends StatefulWidget {
 }
 
 class _MultiplayerLobbyScreenState extends State<MultiplayerLobbyScreen> {
-  // Pure UI state to toggle second player presence for layout testing
-  bool _mockOpponentJoined = false;
+  String? opponentName;
+
+  @override
+  void initState() {
+    super.initState();
+    _connectSocket();
+  }
+
+  void _connectSocket() {
+    final wsUrl = ApiService.baseUrl.replaceFirst('http', 'ws');
+    SocketService.instance.connect(wsUrl, widget.roomCode, widget.userName);
+
+    SocketService.instance.stream.listen((event) {
+      if (!mounted) return;
+      final type = event['type'];
+
+      if (type == 'PLAYER_JOINED') {
+        setState(() {
+          opponentName = event['username'];
+        });
+      } else if (type == 'MATCH_STARTED') {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => MultiplayerCourtScreen(
+              userName: widget.userName,
+              characterStyle: widget.characterStyle,
+              roomCode: widget.roomCode,
+              isHost: widget.isHost,
+              opponentName: opponentName ?? 'Opponent',
+            ),
+          ),
+        );
+      }
+    });
+  }
+
+  void _startMatch() async {
+    final success =
+        await ApiService.startRoomMatch(widget.roomCode, widget.userName);
+    if (success) {
+      SocketService.instance
+          .sendEvent('START_MATCH', {'roomCode': widget.roomCode});
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -36,7 +82,6 @@ class _MultiplayerLobbyScreenState extends State<MultiplayerLobbyScreen> {
             padding: const EdgeInsets.all(24.0),
             child: Column(
               children: [
-                // INVITATION CODE CARD
                 StreetCard(
                   padding: const EdgeInsets.all(20),
                   child: Column(
@@ -49,11 +94,10 @@ class _MultiplayerLobbyScreenState extends State<MultiplayerLobbyScreen> {
                           Text(
                             widget.roomCode,
                             style: const TextStyle(
-                              color: AppColors.gold,
-                              fontSize: 32,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 4,
-                            ),
+                                color: AppColors.gold,
+                                fontSize: 32,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 4),
                           ),
                           const SizedBox(width: 12),
                           IconButton(
@@ -64,9 +108,8 @@ class _MultiplayerLobbyScreenState extends State<MultiplayerLobbyScreen> {
                                   ClipboardData(text: widget.roomCode));
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
-                                  content: Text('Room code copied!'),
-                                  backgroundColor: AppColors.gold,
-                                ),
+                                    content: Text('Room code copied!'),
+                                    backgroundColor: AppColors.gold),
                               );
                             },
                           ),
@@ -76,69 +119,32 @@ class _MultiplayerLobbyScreenState extends State<MultiplayerLobbyScreen> {
                   ),
                 ),
                 const SizedBox(height: 32),
-
-                // LOBBY SLOTS
                 _buildPlayerSlot(
-                  role: 'HOST',
-                  name: widget.isHost ? widget.userName : 'Rival_Host',
-                  isConnected: true,
+                  'HOST',
+                  widget.isHost ? widget.userName : (opponentName ?? 'Host'),
+                  true,
                 ),
                 const SizedBox(height: 16),
                 _buildPlayerSlot(
-                  role: 'GUEST',
-                  name: widget.isHost
-                      ? (_mockOpponentJoined
-                          ? 'StreetKing_99'
-                          : 'Waiting for player...')
+                  'GUEST',
+                  widget.isHost
+                      ? (opponentName ?? 'Waiting for player...')
                       : widget.userName,
-                  isConnected: widget.isHost ? _mockOpponentJoined : true,
+                  widget.isHost ? (opponentName != null) : true,
                 ),
-
-                const SizedBox(height: 20),
-
-                // UI TESTING TOGGLE (SIMULATE OPPONENT JOINING)
-                if (widget.isHost)
-                  TextButton.icon(
-                    onPressed: () {
-                      setState(() {
-                        _mockOpponentJoined = !_mockOpponentJoined;
-                      });
-                    },
-                    icon: const Icon(Icons.bug_report,
-                        color: AppColors.textFaint, size: 16),
-                    label: Text(
-                      _mockOpponentJoined
-                          ? 'UI Test: Remove Guest'
-                          : 'UI Test: Simulate Guest Join',
-                      style: const TextStyle(
-                          color: AppColors.textFaint, fontSize: 12),
-                    ),
-                  ),
-
                 const Spacer(),
-
-                // ACTION BUTTON
                 if (widget.isHost)
                   PrimaryCTA(
-                    label: _mockOpponentJoined
+                    label: opponentName != null
                         ? 'START MULTIPLAYER MATCH'
                         : 'WAITING FOR OPPONENT...',
                     icon: Icons.play_arrow_rounded,
-                    onPressed: _mockOpponentJoined
-                        ? () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                  content: Text('Starting match UI...')),
-                            );
-                          }
-                        : () {},
+                    onPressed: opponentName != null ? _startMatch : () {},
                   )
                 else
-                  const Text(
-                    'Waiting for Host to start the match...',
-                    style: TextStyle(
-                        color: AppColors.gold, fontWeight: FontWeight.bold),
-                  ),
+                  const Text('Waiting for Host to start the match...',
+                      style: TextStyle(
+                          color: AppColors.gold, fontWeight: FontWeight.bold)),
               ],
             ),
           ),
@@ -147,58 +153,45 @@ class _MultiplayerLobbyScreenState extends State<MultiplayerLobbyScreen> {
     );
   }
 
-  Widget _buildPlayerSlot({
-    required String role,
-    required String name,
-    required bool isConnected,
-  }) {
+  Widget _buildPlayerSlot(String role, String name, bool connected) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: isConnected ? AppColors.gold : AppColors.hairline,
-        ),
+        border:
+            Border.all(color: connected ? AppColors.gold : AppColors.hairline),
       ),
       child: Row(
         children: [
           CircleAvatar(
-            backgroundColor: isConnected ? AppColors.gold : AppColors.hairline,
-            child: Icon(
-              Icons.person,
-              color: isConnected ? Colors.black : Colors.white54,
-            ),
+            backgroundColor: connected ? AppColors.gold : AppColors.hairline,
+            child: Icon(Icons.person,
+                color: connected ? Colors.black : Colors.white54),
           ),
           const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  role,
-                  style: const TextStyle(
-                    color: AppColors.textFaint,
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                Text(
-                  name,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
+                Text(role,
+                    style: const TextStyle(
+                        color: AppColors.textFaint,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold)),
+                Text(name,
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900)),
               ],
             ),
           ),
           Icon(
-            isConnected
+            connected
                 ? Icons.check_circle_rounded
                 : Icons.hourglass_top_rounded,
-            color: isConnected ? Colors.greenAccent : AppColors.gold,
+            color: connected ? Colors.greenAccent : AppColors.gold,
           ),
         ],
       ),

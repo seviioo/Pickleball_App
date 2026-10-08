@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import '../models/game_models.dart';
+import '../services/api_service.dart';
 import '../theme/app_theme.dart';
 import 'multiplayer_lobby_screen.dart';
 
@@ -20,8 +21,8 @@ class MultiplayerHubScreen extends StatefulWidget {
 
 class _MultiplayerHubScreenState extends State<MultiplayerHubScreen> {
   final TextEditingController _codeController = TextEditingController();
+  bool _isLoading = false;
 
-  // GENERATE RANDOM ALPHANUMERIC ROOM CODE (e.g., K9B2X7)
   String _generateRandomRoomCode() {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     final random = Random();
@@ -29,43 +30,63 @@ class _MultiplayerHubScreenState extends State<MultiplayerHubScreen> {
         .join();
   }
 
-  void _createRoomUI() {
+  Future<void> _createRoom() async {
     final roomCode = _generateRandomRoomCode();
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => MultiplayerLobbyScreen(
-          userName: widget.userName,
-          characterStyle: widget.characterStyle,
-          roomCode: roomCode,
-          isHost: true,
-        ),
-      ),
-    );
-  }
+    setState(() => _isLoading = true);
 
-  void _joinRoomUI() {
-    final String code = _codeController.text.trim().toUpperCase();
-    if (code.length < 4) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enter a valid room code'),
-          backgroundColor: AppColors.redBright,
+    final result = await ApiService.createRoom(roomCode, widget.userName);
+    setState(() => _isLoading = false);
+
+    if (result != null) {
+      if (!mounted) return;
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => MultiplayerLobbyScreen(
+            userName: widget.userName,
+            characterStyle: widget.characterStyle,
+            roomCode: roomCode,
+            isHost: true,
+          ),
         ),
       );
+    } else {
+      _showError('Failed to create room. Check backend connection.');
+    }
+  }
+
+  Future<void> _joinRoom() async {
+    final String code = _codeController.text.trim().toUpperCase();
+    if (code.length < 4) {
+      _showError('Please enter a valid room code.');
       return;
     }
 
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => MultiplayerLobbyScreen(
-          userName: widget.userName,
-          characterStyle: widget.characterStyle,
-          roomCode: code,
-          isHost: false,
+    setState(() => _isLoading = true);
+    final result = await ApiService.joinRoom(code, widget.userName);
+    setState(() => _isLoading = false);
+
+    if (result != null) {
+      if (!mounted) return;
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => MultiplayerLobbyScreen(
+            userName: widget.userName,
+            characterStyle: widget.characterStyle,
+            roomCode: code,
+            isHost: false,
+          ),
         ),
-      ),
+      );
+    } else {
+      _showError('Invalid room code or room is full.');
+    }
+  }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: AppColors.redBright),
     );
   }
 
@@ -81,49 +102,42 @@ class _MultiplayerHubScreenState extends State<MultiplayerHubScreen> {
             child: Column(
               children: [
                 const Spacer(),
-                const Icon(
-                  Icons.wifi_tethering_rounded,
-                  color: AppColors.gold,
-                  size: 64,
-                ),
+                const Icon(Icons.wifi_tethering_rounded,
+                    color: AppColors.gold, size: 64),
                 const SizedBox(height: 12),
                 const Text(
                   'REAL-TIME STREET MATCHES',
                   style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 22,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 1.2,
-                  ),
+                      color: Colors.white,
+                      fontSize: 22,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 1.2),
                 ),
                 const SizedBox(height: 6),
                 const Text(
-                  'Challenge real players live over room codes',
-                  style: TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 13,
-                  ),
+                  'Challenge real players live over the network',
+                  style:
+                      TextStyle(color: AppColors.textSecondary, fontSize: 13),
                 ),
                 const SizedBox(height: 36),
-                PrimaryCTA(
-                  label: 'CREATE MATCH ROOM',
-                  icon: Icons.add_circle_outline_rounded,
-                  onPressed: _createRoomUI,
-                ),
+                _isLoading
+                    ? const CircularProgressIndicator(color: AppColors.gold)
+                    : PrimaryCTA(
+                        label: 'CREATE MATCH ROOM',
+                        icon: Icons.add_circle_outline_rounded,
+                        onPressed: _createRoom,
+                      ),
                 const SizedBox(height: 24),
                 const Row(
                   children: [
                     Expanded(child: Divider(color: AppColors.hairline)),
                     Padding(
                       padding: EdgeInsets.symmetric(horizontal: 12),
-                      child: Text(
-                        'OR JOIN WITH CODE',
-                        style: TextStyle(
-                          color: AppColors.textFaint,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 11,
-                        ),
-                      ),
+                      child: Text('OR JOIN WITH CODE',
+                          style: TextStyle(
+                              color: AppColors.textFaint,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 11)),
                     ),
                     Expanded(child: Divider(color: AppColors.hairline)),
                   ],
@@ -140,18 +154,16 @@ class _MultiplayerHubScreenState extends State<MultiplayerHubScreen> {
                     textCapitalization: TextCapitalization.characters,
                     textAlign: TextAlign.center,
                     style: const TextStyle(
-                      color: AppColors.gold,
-                      fontSize: 22,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 4,
-                    ),
+                        color: AppColors.gold,
+                        fontSize: 22,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 4),
                     decoration: const InputDecoration(
                       hintText: 'ENTER CODE (e.g. K9B2X7)',
                       hintStyle: TextStyle(
-                        color: AppColors.textFaint,
-                        fontSize: 14,
-                        letterSpacing: 1,
-                      ),
+                          color: AppColors.textFaint,
+                          fontSize: 14,
+                          letterSpacing: 1),
                       border: InputBorder.none,
                       contentPadding: EdgeInsets.symmetric(vertical: 16),
                     ),
@@ -167,19 +179,14 @@ class _MultiplayerHubScreenState extends State<MultiplayerHubScreen> {
                       foregroundColor: Colors.white,
                       side: const BorderSide(color: AppColors.gold, width: 1.5),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
+                          borderRadius: BorderRadius.circular(14)),
                     ),
-                    onPressed: _joinRoomUI,
+                    onPressed: _joinRoom,
                     icon:
                         const Icon(Icons.login_rounded, color: AppColors.gold),
-                    label: const Text(
-                      'JOIN ROOM',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w900,
-                        fontSize: 15,
-                      ),
-                    ),
+                    label: const Text('JOIN ROOM',
+                        style: TextStyle(
+                            fontWeight: FontWeight.w900, fontSize: 15)),
                   ),
                 ),
                 const Spacer(),

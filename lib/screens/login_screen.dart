@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
+import '../models/game_models.dart';
+import '../services/api_service.dart';
 import '../services/storage_service.dart';
 import '../theme/app_theme.dart';
 import 'lobby_screen.dart';
 import 'signup_screen.dart';
-import '../models/game_models.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -31,38 +32,33 @@ class _LoginScreenState extends State<LoginScreen> {
 
     setState(() => _isLoading = true);
 
-    // Simulated check delay
-    await Future.delayed(const Duration(milliseconds: 800));
-
-    // Check locally saved username for now until MongoDB API is connected
-    final savedUser = await StorageService.getUserName();
+    final result = await ApiService.login(
+      username: username,
+      password: password,
+    );
 
     setState(() => _isLoading = false);
 
-    // If user does not exist locally or login fails
-    if (savedUser == null ||
-        savedUser.isEmpty ||
-        savedUser.toLowerCase() != username.toLowerCase()) {
-      _showAccountNotFoundDialog(
-        title: 'Account Not Found',
-        message:
-            'No registered account found for "$username". Please create a new profile first!',
-      );
-      return;
-    }
+    if (result != null) {
+      await StorageService.saveUserName(username);
+      if (!mounted) return;
 
-    if (!mounted) return;
-
-    // Proceed to LobbyScreen
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (context) => LobbyScreen(
-          userName: username,
-          characterStyle: kCharacterStyles[0],
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => LobbyScreen(
+            userName: username,
+            characterStyle: kCharacterStyles[0],
+          ),
         ),
-      ),
-    );
+      );
+    } else {
+      _showAccountNotFoundDialog(
+        title: 'Invalid Credentials',
+        message:
+            'Incorrect username or password. Please try again or create a profile.',
+      );
+    }
   }
 
   void _showAccountNotFoundDialog(
@@ -78,10 +74,9 @@ class _LoginScreenState extends State<LoginScreen> {
         title: Text(
           title,
           style: const TextStyle(
-            color: AppColors.redBright,
-            fontWeight: FontWeight.w900,
-            fontSize: 18,
-          ),
+              color: AppColors.redBright,
+              fontWeight: FontWeight.w900,
+              fontSize: 18),
         ),
         content: Text(
           message,
@@ -90,10 +85,8 @@ class _LoginScreenState extends State<LoginScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text(
-              'CANCEL',
-              style: TextStyle(color: AppColors.textSecondary),
-            ),
+            child: const Text('CANCEL',
+                style: TextStyle(color: AppColors.textSecondary)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -105,11 +98,9 @@ class _LoginScreenState extends State<LoginScreen> {
               Navigator.pop(context);
               _navigateToSignUp();
             },
-            child: const Text(
-              'CREATE PROFILE',
-              style:
-                  TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
-            ),
+            child: const Text('CREATE PROFILE',
+                style: TextStyle(
+                    color: Colors.black, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -121,7 +112,6 @@ class _LoginScreenState extends State<LoginScreen> {
       context,
       MaterialPageRoute(builder: (context) => const SignUpScreen()),
     );
-
     if (result != null && result.containsKey('username')) {
       setState(() {
         _usernameController.text = result['username'];
@@ -141,69 +131,51 @@ class _LoginScreenState extends State<LoginScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(
-                    Icons.sports_tennis_rounded,
-                    color: AppColors.gold,
-                    size: 64,
-                  ),
+                  const Icon(Icons.sports_tennis_rounded,
+                      color: AppColors.gold, size: 64),
                   const SizedBox(height: 12),
-                  const Text(
-                    'Picklyball Street Blitz',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 26,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 1.5,
-                    ),
-                  ),
+                  const Text('Picklyball Street Blitz',
+                      style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 26,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 1.5)),
                   const SizedBox(height: 6),
-                  const Text(
-                    'Enter your Username / IGN to hit the court',
-                    style: TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: 12,
-                    ),
-                  ),
+                  const Text('Enter your Username / IGN to hit the court',
+                      style: TextStyle(
+                          color: AppColors.textSecondary, fontSize: 12)),
                   const SizedBox(height: 32),
                   _buildTextField(
-                    controller: _usernameController,
-                    hint: 'Username / IGN',
-                    icon: Icons.badge_outlined,
-                  ),
+                      controller: _usernameController,
+                      hint: 'Username / IGN',
+                      icon: Icons.badge_outlined),
                   const SizedBox(height: 14),
                   _buildTextField(
-                    controller: _passwordController,
-                    hint: 'Password',
-                    icon: Icons.lock_outline,
-                    obscureText: true,
-                  ),
+                      controller: _passwordController,
+                      hint: 'Password',
+                      icon: Icons.lock_outline,
+                      obscureText: true),
                   const SizedBox(height: 24),
                   _isLoading
                       ? const CircularProgressIndicator(color: AppColors.gold)
                       : PrimaryCTA(
                           label: 'Log In',
                           icon: Icons.login_rounded,
-                          onPressed: _handleLogin,
-                        ),
+                          onPressed: _handleLogin),
                   const SizedBox(height: 16),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Text(
-                        "Don't have a profile yet? ",
-                        style: TextStyle(
-                            color: AppColors.textSecondary, fontSize: 13),
-                      ),
+                      const Text("Don't have a profile yet? ",
+                          style: TextStyle(
+                              color: AppColors.textSecondary, fontSize: 13)),
                       GestureDetector(
                         onTap: _navigateToSignUp,
-                        child: const Text(
-                          'Register',
-                          style: TextStyle(
-                            color: AppColors.gold,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 13,
-                          ),
-                        ),
+                        child: const Text('Register',
+                            style: TextStyle(
+                                color: AppColors.gold,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13)),
                       ),
                     ],
                   ),
@@ -216,33 +188,28 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  Widget _buildTextField({
-    required TextEditingController controller,
-    required String hint,
-    required IconData icon,
-    bool obscureText = false,
-  }) {
+  Widget _buildTextField(
+      {required TextEditingController controller,
+      required String hint,
+      required IconData icon,
+      bool obscureText = false}) {
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.hairline, width: 1.5),
-      ),
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.hairline, width: 1.5)),
       child: TextField(
         controller: controller,
         obscureText: obscureText,
         style: const TextStyle(
-          color: AppColors.textPrimary,
-          fontWeight: FontWeight.w700,
-        ),
+            color: AppColors.textPrimary, fontWeight: FontWeight.w700),
         decoration: InputDecoration(
-          prefixIcon: Icon(icon, color: AppColors.gold, size: 20),
-          hintText: hint,
-          hintStyle: const TextStyle(color: AppColors.textFaint),
-          border: InputBorder.none,
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-        ),
+            prefixIcon: Icon(icon, color: AppColors.gold, size: 20),
+            hintText: hint,
+            hintStyle: const TextStyle(color: AppColors.textFaint),
+            border: InputBorder.none,
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 16)),
       ),
     );
   }
