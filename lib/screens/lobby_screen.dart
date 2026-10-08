@@ -3,6 +3,7 @@ import '../models/game_models.dart';
 import '../services/storage_service.dart';
 import 'equipment_screen.dart';
 import 'match_setup_screen.dart';
+import 'multiplayer_hub_screen.dart';
 import 'practice_tutorial_screen.dart';
 import 'settings_screen.dart';
 import 'tournament_screen.dart';
@@ -118,7 +119,6 @@ class _LobbyScreenState extends State<LobbyScreen> {
                 ],
               ),
               const SizedBox(height: 20),
-
               // Stats Row
               Row(
                 children: [
@@ -139,7 +139,6 @@ class _LobbyScreenState extends State<LobbyScreen> {
                 ],
               ),
               const SizedBox(height: 20),
-
               // Daily Stash Banner
               if (_canClaimDaily)
                 GestureDetector(
@@ -193,7 +192,6 @@ class _LobbyScreenState extends State<LobbyScreen> {
                   ),
                 ),
               if (_canClaimDaily) const SizedBox(height: 20),
-
               // Main Menu Options
               _buildMenuCard(
                 title: 'QUICK MATCH',
@@ -214,7 +212,25 @@ class _LobbyScreenState extends State<LobbyScreen> {
                 },
               ),
               const SizedBox(height: 12),
-
+              _buildMenuCard(
+                title: 'ONLINE MULTIPLAYER',
+                subtitle: 'Play against real players live via Room Code',
+                icon: Icons.public,
+                color: Colors.greenAccent,
+                onTap: () async {
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => MultiplayerHubScreen(
+                        userName: widget.userName,
+                        characterStyle: widget.characterStyle,
+                      ),
+                    ),
+                  );
+                  _loadUserData();
+                },
+              ),
+              const SizedBox(height: 12),
               _buildMenuCard(
                 title: 'UNDERGROUND TOURNAMENT',
                 subtitle: 'Climb the bracket to win the Grand Prize Purse',
@@ -231,7 +247,6 @@ class _LobbyScreenState extends State<LobbyScreen> {
                 },
               ),
               const SizedBox(height: 12),
-
               _buildMenuCard(
                 title: 'BLACK MARKET GEAR',
                 subtitle: 'Unlock & equip high performance paddles',
@@ -248,7 +263,6 @@ class _LobbyScreenState extends State<LobbyScreen> {
                 },
               ),
               const SizedBox(height: 12),
-
               _buildMenuCard(
                 title: 'PRACTICE & TUTORIAL',
                 subtitle: 'Master dinks, drives, and kitchen rules',
@@ -257,7 +271,6 @@ class _LobbyScreenState extends State<LobbyScreen> {
                 onTap: () async {
                   final paddle = await StorageService.getEquippedPaddle();
                   if (!mounted) return;
-
                   Navigator.push(
                     context,
                     MaterialPageRoute(
