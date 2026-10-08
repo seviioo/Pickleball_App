@@ -539,7 +539,7 @@ setInterval(() => {
     const sockets = socketsByRoom.get(state.roomCode) || [];
     for (const socket of sockets) {
       if (socket.readyState === 1) {
-        socket.send(JSON.stringify(snapshotFor(state, socket.clientId)));
+        socket.send(JSON.stringify(snapshotFor(state, socket.playerId)));
       }
     }
   }
@@ -625,6 +625,7 @@ webSocketServer.on('connection', async (socket, request) => {
   socket.isAlive = true;
   socket.roomCode = roomCode;
   socket.clientId = clientId;
+  socket.playerId = player._id.toString();
   socket.username = username || player.displayName;
 
   socket.on('pong', () => {
@@ -639,10 +640,10 @@ webSocketServer.on('connection', async (socket, request) => {
       if (message.type === 'MOVE') {
         const dx = clamp(Number(message.dx) || 0, -1, 1);
         const dy = clamp(Number(message.dy) || 0, -1, 1);
-        state.input.set(socket.clientId, { dx, dy });
-        state.inputAt.set(socket.clientId, Date.now());
+        state.input.set(socket.playerId, { dx, dy });
+        state.inputAt.set(socket.playerId, Date.now());
       } else if (message.type === 'SHOT') {
-        startServerShot(state, socket.clientId, {
+        startServerShot(state, socket.playerId, {
           type: String(message.shotType || 'DRIVE'),
           x: message.x,
         });
@@ -661,7 +662,7 @@ webSocketServer.on('connection', async (socket, request) => {
   socket.send(JSON.stringify({ type: 'CONNECTED', username: socket.username }));
   const state = getMatchState(room);
   if (state) {
-    socket.send(JSON.stringify(snapshotFor(state, socket.clientId)));
+    socket.send(JSON.stringify(snapshotFor(state, socket.playerId)));
   }
   const connectedPlayers = room.players
     .map((entry) => entry.playerId.toString())
