@@ -44,8 +44,32 @@ class _MultiplayerLobbyScreenState extends State<MultiplayerLobbyScreen> {
 
   Future<void> _checkRoomStatus() async {
     if (_openingCourt || !mounted) return;
-    final status = await ApiService.getRoomStatus(widget.roomCode);
-    if (status == 'in_progress') _openCourt();
+    final room = await ApiService.getRoomStatus(widget.roomCode);
+    if (room == null || !mounted || _openingCourt) return;
+
+    final players = room['players'];
+    if (players is List) {
+      String? detectedOpponent;
+      for (final entry in players) {
+        if (entry is! Map) continue;
+        final player = entry['playerId'];
+        if (player is! Map) continue;
+        final displayName = player['displayName'];
+        if (displayName is String &&
+            displayName.isNotEmpty &&
+            displayName != widget.userName) {
+          detectedOpponent = displayName;
+          break;
+        }
+      }
+      if (detectedOpponent != null && detectedOpponent != opponentName) {
+        setState(() {
+          opponentName = detectedOpponent;
+        });
+      }
+    }
+
+    if (room['status'] == 'in_progress') _openCourt();
   }
 
   Future<void> _connectSocket() async {
