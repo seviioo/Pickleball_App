@@ -256,10 +256,17 @@ app.post('/api/rooms', asyncRoute(async (request, response) => {
 
 app.post('/api/rooms/:roomCode/join', asyncRoute(async (request, response) => {
   const player = await Player.findOne({ clientId: request.body.clientId });
-  const room = await GameRoom.findOne({ roomCode: request.params.roomCode.toUpperCase(), status: 'waiting' });
+  const room = await GameRoom.findOne({ roomCode: request.params.roomCode.toUpperCase() });
   if (!player) return response.status(404).json({ error: 'Player not found' });
-  if (!room) return response.status(404).json({ error: 'Room not found or no longer accepting players' });
+  if (!room) return response.status(404).json({ error: 'Room not found' });
   if (room.players.some((entry) => entry.playerId.equals(player._id))) return response.json(room);
+  if (room.status !== 'waiting') {
+    return response.status(409).json({
+      error: room.status === 'ready' || room.status === 'in_progress'
+        ? 'Room is full or the match has already started'
+        : 'Room is no longer accepting players'
+    });
+  }
   if (room.players.length >= room.maxPlayers) return response.status(409).json({ error: 'Room is full' });
 
   room.players.push({ playerId: player._id, role: 'player' });
