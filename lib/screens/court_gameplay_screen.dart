@@ -404,7 +404,7 @@ class _CourtGameplayScreenState extends State<CourtGameplayScreen> {
                 ),
                 // Header Bar
                 Positioned(
-                  top: isLandscape ? 6 : 12,
+                  top: 12,
                   left: 12,
                   right: 12,
                   child: Row(
@@ -418,9 +418,8 @@ class _CourtGameplayScreenState extends State<CourtGameplayScreen> {
                         ],
                       ),
                       Container(
-                        padding: EdgeInsets.symmetric(
-                            horizontal: isLandscape ? 12 : 16,
-                            vertical: isLandscape ? 4 : 8),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 8),
                         decoration: BoxDecoration(
                           color: const Color(0xFF18181B),
                           borderRadius: BorderRadius.circular(12),
@@ -434,9 +433,9 @@ class _CourtGameplayScreenState extends State<CourtGameplayScreen> {
                             const SizedBox(width: 8),
                             Text(
                               '$playerScore - $opponentScore',
-                              style: TextStyle(
+                              style: const TextStyle(
                                 color: Colors.white,
-                                fontSize: isLandscape ? 16 : 20,
+                                fontSize: 20,
                                 fontWeight: FontWeight.w900,
                               ),
                             ),
@@ -465,7 +464,7 @@ class _CourtGameplayScreenState extends State<CourtGameplayScreen> {
                 ),
                 // Status Banner
                 Positioned(
-                  top: isLandscape ? 44 : 68,
+                  top: isLandscape ? 56 : 68,
                   left: 0,
                   right: 0,
                   child: Center(
@@ -490,57 +489,47 @@ class _CourtGameplayScreenState extends State<CourtGameplayScreen> {
                   ),
                 ),
                 if (!isGameOver) ...[
-                  // Dynamic Joystick Control Placement
+                  // Dynamic Movement Joystick Control Placement
                   Positioned(
                     left: isLandscape ? 36 : 24,
-                    bottom: isLandscape ? 16 : 24,
+                    bottom: isLandscape ? 20 : 24,
                     child: TouchJoystickWheel(
                       onJoystickMoved: (Offset direction) {
                         game.updatePlayerMovement(direction);
                       },
                     ),
                   ),
-                  // Dynamic Action Button Controls
+                  
+                  // Dynamic DRAG-TO-AIM Action Button Controls
                   Positioned(
                     right: isLandscape ? 36 : 20,
-                    bottom: isLandscape ? 12 : 20,
+                    bottom: isLandscape ? 16 : 20,
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        if (isPlayerServing &&
-                            gameState == GameMatchState.ready)
+                        if (isPlayerServing && gameState == GameMatchState.ready)
                           Padding(
-                            padding: const EdgeInsets.only(bottom: 8),
-                            child: SizedBox(
-                              width: 120,
-                              height: isLandscape ? 40 : 48,
-                              child: ElevatedButton.icon(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFFFACC15),
-                                  foregroundColor: Colors.black,
-                                  shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12)),
-                                ),
-                                onPressed: () => game.triggerAttack('SERVE'),
-                                icon: const Icon(Icons.sports_tennis, size: 18),
-                                label: const Text('SERVE',
-                                    style:
-                                        TextStyle(fontWeight: FontWeight.w900)),
-                              ),
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: _buildAimableButton(
+                              label: 'SERVE',
+                              shotType: 'SERVE',
+                              isPrimary: true,
+                              width: 130,
+                              height: 48,
                             ),
                           ),
                         Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            _buildStreetButton(
+                            _buildAimableButton(
                               label: 'SLICE',
-                              onPressed: () => game.triggerAttack('ROLL'),
+                              shotType: 'ROLL',
                             ),
                             const SizedBox(width: 12),
-                            _buildStreetButton(
+                            _buildAimableButton(
                               label: 'DRIVE',
-                              onPressed: () => game.triggerAttack('DRIVE'),
+                              shotType: 'DRIVE',
                               isPrimary: true,
                             ),
                           ],
@@ -549,14 +538,14 @@ class _CourtGameplayScreenState extends State<CourtGameplayScreen> {
                         Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            _buildStreetButton(
+                            _buildAimableButton(
                               label: 'LOB',
-                              onPressed: () => game.triggerAttack('LOB'),
+                              shotType: 'LOB',
                             ),
                             const SizedBox(width: 12),
-                            _buildStreetButton(
+                            _buildAimableButton(
                               label: 'SMASH',
-                              onPressed: () => game.triggerAttack('SMASH'),
+                              shotType: 'SMASH',
                             ),
                           ],
                         ),
@@ -589,34 +578,145 @@ class _CourtGameplayScreenState extends State<CourtGameplayScreen> {
     );
   }
 
-  Widget _buildStreetButton(
-      {required String label,
-      required VoidCallback onPressed,
-      bool isPrimary = false}) {
+  Widget _buildAimableButton({
+    required String label,
+    required String shotType,
+    bool isPrimary = false,
+    double? width,
+    double? height,
+  }) {
+    return AimableShotButton(
+      label: label,
+      isPrimary: isPrimary,
+      width: width,
+      height: height,
+      onAim: (Offset dir) => game.updateAim(dir),
+      onShoot: () => game.triggerAttack(shotType),
+    );
+  }
+}
+
+// ==========================================
+// DRAG-TO-AIM ACTION BUTTON
+// ==========================================
+class AimableShotButton extends StatefulWidget {
+  final String label;
+  final bool isPrimary;
+  final double? width;
+  final double? height;
+  final Function(Offset) onAim;
+  final VoidCallback onShoot;
+
+  const AimableShotButton({
+    super.key,
+    required this.label,
+    this.isPrimary = false,
+    this.width,
+    this.height,
+    required this.onAim,
+    required this.onShoot,
+  });
+
+  @override
+  State<AimableShotButton> createState() => _AimableShotButtonState();
+}
+
+class _AimableShotButtonState extends State<AimableShotButton> {
+  Offset _dragOffset = Offset.zero;
+  final double _maxDragRadius = 35.0; // The threshold before normal capping kicks in
+
+  void _handleAim(Offset localPosition, Size buttonSize) {
+    // Find the center of the button relative to its own size
+    final Offset center = Offset(buttonSize.width / 2, buttonSize.height / 2);
+    Offset delta = localPosition - center;
+
+    // Cap the visual drag inside the button bounds
+    if (delta.distance > _maxDragRadius) {
+      delta = (delta / delta.distance) * _maxDragRadius;
+    }
+
+    setState(() {
+      _dragOffset = delta;
+    });
+
+    // Send normalized vector (-1.0 to 1.0) to the physics engine
+    widget.onAim(Offset(delta.dx / _maxDragRadius, delta.dy / _maxDragRadius));
+  }
+
+  void _resetAndShoot() {
+    widget.onShoot();
+    setState(() {
+      _dragOffset = Offset.zero; 
+    });
+    // We purposefully do NOT reset game aim here so the shot remembers the target
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Default size is 72x72 for primary (Drive), 64x64 for secondary (Lob/Smash/Slice)
+    final double defaultSize = widget.isPrimary ? 72.0 : 64.0;
+    final double finalWidth = widget.width ?? defaultSize;
+    final double finalHeight = widget.height ?? defaultSize;
+    final bool isPill = widget.width != null && widget.width! > finalHeight;
+
     return GestureDetector(
-      onTap: onPressed,
+      onPanStart: (details) => _handleAim(details.localPosition, Size(finalWidth, finalHeight)),
+      onPanUpdate: (details) => _handleAim(details.localPosition, Size(finalWidth, finalHeight)),
+      onPanEnd: (_) => _resetAndShoot(),
+      onPanCancel: () {
+        setState(() => _dragOffset = Offset.zero);
+        widget.onAim(Offset.zero);
+      },
+      onTap: () {
+        // Quick taps fire a straight shot down the center
+        widget.onAim(Offset.zero);
+        widget.onShoot();
+      },
       child: Container(
-        width: isPrimary ? 72 : 64,
-        height: isPrimary ? 72 : 64,
+        width: finalWidth,
+        height: finalHeight,
         decoration: BoxDecoration(
-          color: isPrimary ? const Color(0xFFDC2626) : const Color(0xFF27272A),
-          shape: BoxShape.circle,
+          color: widget.isPrimary ? const Color(0xFFDC2626) : const Color(0xFF27272A),
+          borderRadius: BorderRadius.circular(isPill ? 16 : finalWidth / 2),
           border: Border.all(
-              color: isPrimary ? const Color(0xFFFACC15) : Colors.white38,
-              width: 2.5),
-        ),
-        child: Center(
-          child: Text(
-            label,
-            style: const TextStyle(
-                color: Colors.white, fontWeight: FontWeight.w900, fontSize: 11),
+            color: widget.isPrimary ? const Color(0xFFFACC15) : Colors.white38,
+            width: 2.5,
           ),
+        ),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Text(
+              widget.label,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w900,
+                fontSize: 11,
+              ),
+            ),
+            // A subtle thumb-pad indicator that renders while dragging
+            if (_dragOffset != Offset.zero)
+              Transform.translate(
+                offset: _dragOffset,
+                child: Container(
+                  width: 20,
+                  height: 20,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white.withOpacity(0.35),
+                  ),
+                ),
+              ),
+          ],
         ),
       ),
     );
   }
 }
 
+// ==========================================
+// MOVEMENT JOYSTICK
+// ==========================================
 class TouchJoystickWheel extends StatefulWidget {
   final Function(Offset direction) onJoystickMoved;
   const TouchJoystickWheel({super.key, required this.onJoystickMoved});
