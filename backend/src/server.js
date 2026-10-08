@@ -2,10 +2,12 @@ import 'dotenv/config';
 import cors from 'cors';
 import express from 'express';
 import mongoose from 'mongoose';
+import { WebSocketServer } from 'ws';
 import { randomBytes, randomUUID, scryptSync, timingSafeEqual } from 'node:crypto';
 
 const app = express();
 const port = Number(process.env.PORT || 3000);
+const socketsByRoom = new Map();
 
 app.use(cors({ origin: process.env.CORS_ORIGIN || '*' }));
 app.use(express.json({ limit: '32kb' }));
@@ -300,6 +302,7 @@ app.post('/api/rooms/:roomCode/start', asyncRoute(async (request, response) => {
     actorPlayerId: player._id,
     clientEventId: `room:${room._id}:started`
   });
+  broadcastToRoom(room.roomCode, { type: 'MATCH_STARTED' });
   response.status(201).json({ room, match });
 }));
 
@@ -319,6 +322,17 @@ app.post('/api/rooms/:roomCode/events', asyncRoute(async (request, response) => 
   );
   response.status(201).json(event);
 }));
+
+function broadcastToRoom(roomCode, message, excludedSocket = null) {
+  const sockets = socketsByRoom.get(roomCode);
+  if (!sockets) return;
+  const encoded = JSON.stringify(message);
+  for (const socket of sockets) {
+    if (socket !== excludedSocket && socket.readyState === 1) {
+      socket.send(encoded);
+    }
+  }
+}
 
 app.post('/api/players/:clientId/matches', asyncRoute(async (request, response) => {
   const { clientId } = request.params;
@@ -373,4 +387,82 @@ if (!mongodbUri) {
 }
 
 await mongoose.connect(mongodbUri);
-app.listen(port, () => console.log(`Pickleball API listening on port ${port}`));
+const server = app.listen(port, () =>
+  console.log(`Pickleball API listening on port ${port}`)
+);
+const webSocketServer = new WebSocketServer({ server });
+
+webSocketServer.on('connection', async (socket, request) => {
+  const query = new URL(request.url, `http://${request.headers.host}`)
+    .searchParams;
+  const roomCode = String(query.get('roomCode') || '').trim().toUpperCase();
+  const clientId = String(query.get('clientId') || '').trim();
+  const username = String(query.get('username') || '').trim();
+
+  const player = clientId ? await Player.findOne({ clientId }).lean() : null;
+  const room = roomCode
+    ? await GameRoom.findOne({ roomCode, status: { $in: ['waiting', 'ready', 'in_progress'] } })
+    : null;
+  if (!player || !room || !room.players.some((entry) => entry.playerId.equals(player._id))) {
+    socket.close(1008, 'Invalid room or player');
+    return;
+  }
+
+  const sockets = socketsByRoom.get(roomCode) || new Set();
+  sockets.add(socket);
+  socketsByRoom.set(roomCode, sockets);
+  socket.isAlive = true;
+  socket.roomCode = roomCode;
+  socket.clientId = clientId;
+  socket.username = username || player.displayName;
+
+  socket.on('pong', () => {
+    socket.isAlive = true;
+  });
+  socket.on('message', (rawMessage) => {
+    try {
+      const message = JSON.parse(rawMessage.toString());
+      if (!message || typeof message.type !== 'string') return;
+      broadcastToRoom(roomCode, {
+        type: message.type,
+        ...message,
+        username: socket.username,
+      }, socket);
+    } catch (error) {
+      console.error('Invalid WebSocket message:', error);
+      socket.send(JSON.stringify({ type: 'ERROR', message: 'Invalid event' }));
+    }
+  });
+  socket.on('close', () => {
+    sockets.delete(socket);
+    if (sockets.size === 0) socketsByRoom.delete(roomCode);
+    else broadcastToRoom(roomCode, { type: 'PLAYER_LEFT', username: socket.username });
+  });
+
+  socket.send(JSON.stringify({ type: 'CONNECTED', username: socket.username }));
+  const connectedPlayers = room.players
+    .map((entry) => entry.playerId.toString())
+    .filter((playerId) => playerId !== player._id.toString());
+  const opponents = await Player.find({ _id: { $in: connectedPlayers } })
+    .select('displayName')
+    .lean();
+  socket.send(JSON.stringify({
+    type: 'ROOM_STATE',
+    players: opponents.map((entry) => entry.displayName)
+  }));
+  broadcastToRoom(roomCode, { type: 'PLAYER_JOINED', username: socket.username }, socket);
+});
+
+const heartbeat = setInterval(() => {
+  for (const sockets of socketsByRoom.values()) {
+    for (const socket of sockets) {
+      if (!socket.isAlive) {
+        socket.terminate();
+        continue;
+      }
+      socket.isAlive = false;
+      socket.ping();
+    }
+  }
+}, 15000);
+heartbeat.unref();
