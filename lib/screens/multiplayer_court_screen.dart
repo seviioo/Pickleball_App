@@ -160,8 +160,7 @@ class _MultiplayerCourtScreenState extends State<MultiplayerCourtScreen> {
         (matchPhase != 'ready' && matchPhase != 'rally')) {
       return;
     }
-    final targetY =
-        (_aimDirection.dy * 0.35 - 0.65).clamp(-0.92, -0.20).toDouble();
+    final targetY = _aimTargetY;
     SocketService.instance.sendEvent('SHOT', {
       'shotType': type,
       'targetX': _aimDirection.dx.clamp(-0.92, 0.92).toDouble(),
@@ -171,6 +170,9 @@ class _MultiplayerCourtScreenState extends State<MultiplayerCourtScreen> {
       'aimY': targetY,
     });
   }
+
+  double get _aimTargetY =>
+      (_aimDirection.dy * 0.35 - 0.65).clamp(-0.92, -0.20).toDouble();
 
   void _updateAim(Offset direction) {
     _aimDirection = direction;
@@ -299,7 +301,7 @@ class _MultiplayerCourtScreenState extends State<MultiplayerCourtScreen> {
                       ((matchPhase == 'ready' && isPlayerServing) ||
                           (matchPhase == 'rally' && ballHeight < 0.8)),
                   aimX: _aimDirection.dx.clamp(-0.92, 0.92),
-                  aimY: _aimDirection.dy == 0 ? -0.65 : _aimDirection.dy,
+                  aimY: _aimTargetY,
                   aimScatter: 0.15,
                   showAim: _hasAuthoritativeState &&
                       !_paused &&
