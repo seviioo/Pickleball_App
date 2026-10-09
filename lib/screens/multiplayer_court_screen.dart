@@ -47,6 +47,8 @@ class _MultiplayerCourtScreenState extends State<MultiplayerCourtScreen> {
   int myScore = 0;
   int opponentScore = 0;
   bool isGameOver = false;
+  bool _hasAuthoritativeState = false;
+  String matchPhase = 'connecting';
   String matchStatus = 'STREET SERVE READY';
   bool isPlayerServing = true;
   String playerAnimState = 'idle';
@@ -79,6 +81,8 @@ class _MultiplayerCourtScreenState extends State<MultiplayerCourtScreen> {
           myScore = _number(event['myScore']).round();
           opponentScore = _number(event['opponentScore']).round();
           isPlayerServing = event['isServing'] == true;
+          matchPhase = '${event['phase'] ?? 'rally'}';
+          _hasAuthoritativeState = true;
           isGameOver = event['isGameOver'] == true;
           matchStatus = '${event['status'] ?? 'RALLY'}';
           ballX = _number(event['ballX']);
@@ -262,13 +266,17 @@ class _MultiplayerCourtScreenState extends State<MultiplayerCourtScreen> {
                   aiMoveAmount: opponentAnimState == 'walking' ? 0.7 : 0.0,
                   aiMoveX: 0,
                   playerReach: 0.22,
-                  ballInReach: isPlayerServing || ballHeight < 0.8,
+                  ballInReach: _hasAuthoritativeState &&
+                      ((matchPhase == 'ready' && isPlayerServing) ||
+                          (matchPhase == 'rally' && ballHeight < 0.8)),
                   aimX: _aimDirection.dx.clamp(-0.92, 0.92),
                   aimY: _aimDirection.dy == 0 ? -0.65 : _aimDirection.dy,
                   aimScatter: 0.15,
-                  showAim: !_paused &&
+                  showAim: _hasAuthoritativeState &&
+                      !_paused &&
                       !isGameOver &&
-                      (isPlayerServing || ballHeight < 0.8),
+                      ((matchPhase == 'ready' && isPlayerServing) ||
+                          (matchPhase == 'rally' && ballHeight < 0.8)),
                 ),
               ),
             ),
@@ -415,7 +423,7 @@ class _MultiplayerCourtScreenState extends State<MultiplayerCourtScreen> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    if (isPlayerServing)
+                    if (matchPhase == 'ready' && isPlayerServing)
                       Padding(
                         padding: const EdgeInsets.only(bottom: 12),
                         child: _buildAimableButton(
