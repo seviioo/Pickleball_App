@@ -1,445 +1,399 @@
 import 'package:flutter/material.dart';
 
-// ---------------------------------------------------------------------------
-// ENUMS
-// ---------------------------------------------------------------------------
+// ==========================================
+// CHARACTER ANIMATION & STYLE MODELS
+// ==========================================
 enum CharacterAnimState {
   idle,
+  running,
+  swinging,
+  celebrating,
+  serving,
+  drive,
   smash,
   slice,
   lob,
-  serving,
-  drive,
-  walkingUp,
-  walkingDown,
-  walkingLeft,
-  walkingRight,
-  run,
-  hit,
-  serve,
 }
 
-enum OrbType {
-  speedDemon,
-  doublePoints,
-  shrinkOpponent,
-  shrinkRay,
-  speedBoost,
+class CharacterStyleData {
+  final String id;
+  final String name;
+  final Color outfitPrimary;
+  final Color outfitSecondary;
+  final Color skinTone;
+  final double speedMultiplier;
+  final int price;
+  final bool isUnlocked;
+
+  const CharacterStyleData({
+    required this.id,
+    required this.name,
+    required this.outfitPrimary,
+    required this.outfitSecondary,
+    required this.skinTone,
+    this.speedMultiplier = 1.0,
+    required this.price,
+    this.isUnlocked = false,
+  });
+
+  Color get primaryColor => outfitPrimary;
+  Color get secondaryColor => outfitSecondary;
 }
 
+final List<CharacterStyleData> kCharacterStyles = [
+  const CharacterStyleData(
+    id: 'rookie_blue',
+    name: 'Rookie Blue',
+    outfitPrimary: Color(0xFF2563EB),
+    outfitSecondary: Color(0xFF1D4ED8),
+    skinTone: Color(0xFFFDBA74),
+    speedMultiplier: 1.0,
+    price: 0,
+    isUnlocked: true,
+  ),
+  const CharacterStyleData(
+    id: 'urban_fire',
+    name: 'Urban Fire',
+    outfitPrimary: Color(0xFFDC2626),
+    outfitSecondary: Color(0xFF991B1B),
+    skinTone: Color(0xFFFED7AA),
+    speedMultiplier: 1.05,
+    price: 500,
+    isUnlocked: false,
+  ),
+  const CharacterStyleData(
+    id: 'neon_strike',
+    name: 'Neon Strike',
+    outfitPrimary: Color(0xFF10B981),
+    outfitSecondary: Color(0xFF047857),
+    skinTone: Color(0xFFFDE68A),
+    speedMultiplier: 1.1,
+    price: 1000,
+    isUnlocked: false,
+  ),
+];
+
+// ==========================================
+// PADDLE RARITY ENUM & STYLING
+// ==========================================
 enum PaddleRarity {
   common,
-  rare,
+  uncommon,
+  epic,
   legendary,
-}
+  mythic,
+  divine,
+  eternal;
 
-extension PaddleRarityExtension on PaddleRarity {
   String get label {
     switch (this) {
       case PaddleRarity.common:
-        return 'STREET COMMON';
-      case PaddleRarity.rare:
-        return 'PRO RARE';
+        return 'COMMON';
+      case PaddleRarity.uncommon:
+        return 'UNCOMMON';
+      case PaddleRarity.epic:
+        return 'EPIC';
       case PaddleRarity.legendary:
-        return 'BLACK MARKET ELITE';
+        return 'LEGENDARY';
+      case PaddleRarity.mythic:
+        return 'MYTHIC';
+      case PaddleRarity.divine:
+        return 'DIVINE';
+      case PaddleRarity.eternal:
+        return 'ETERNAL';
     }
   }
 
   Color get color {
     switch (this) {
       case PaddleRarity.common:
-        return const Color(0xFFA1A1AA);
-      case PaddleRarity.rare:
-        return const Color(0xFF38BDF8);
+        return const Color(0xFF9CA3AF);
+      case PaddleRarity.uncommon:
+        return const Color(0xFF22C55E);
+      case PaddleRarity.epic:
+        return const Color(0xFFA855F7);
       case PaddleRarity.legendary:
-        return const Color(0xFFFACC15);
+        return const Color(0xFFF59E0B);
+      case PaddleRarity.mythic:
+        return const Color(0xFFEF4444);
+      case PaddleRarity.divine:
+        return const Color(0xFF38BDF8);
+      case PaddleRarity.eternal:
+        return const Color(0xFFEC4899);
     }
   }
 }
 
-// ---------------------------------------------------------------------------
+// ==========================================
 // PADDLE DATA MODEL
-// ---------------------------------------------------------------------------
+// ==========================================
 class PaddleData {
   final String id;
   final String name;
-  final String imagePath;
   final int power;
   final int control;
   final int spin;
   final int price;
   final bool isUnlocked;
   final PaddleRarity rarity;
+  final Color faceColor;
+  final Color accentColor;
+  final String patternStyle;
 
   PaddleData({
     required this.id,
     required this.name,
-    required this.imagePath,
     required this.power,
     required this.control,
     required this.spin,
     required this.price,
     required this.isUnlocked,
     required this.rarity,
-  });
+    Color? faceColor,
+    Color? accentColor,
+    this.patternStyle = 'plain',
+  })  : faceColor = faceColor ?? rarity.color,
+        accentColor = accentColor ?? Colors.white;
 
   factory PaddleData.starter() {
     return PaddleData(
       id: 'starter_paddle',
-      name: 'Street Woodie',
-      imagePath: 'assets/paddles/starter_paddle.png',
+      name: 'Common Paddle I',
       power: 40,
       control: 60,
       spin: 30,
       price: 0,
       isUnlocked: true,
       rarity: PaddleRarity.common,
+      faceColor: const Color(0xFF4B5563),
+      accentColor: const Color(0xFF9CA3AF),
+      patternStyle: 'stripes',
     );
   }
 
   PaddleData copyWith({
     String? id,
     String? name,
-    String? imagePath,
     int? power,
     int? control,
     int? spin,
     int? price,
     bool? isUnlocked,
     PaddleRarity? rarity,
+    Color? faceColor,
+    Color? accentColor,
+    String? patternStyle,
   }) {
     return PaddleData(
       id: id ?? this.id,
       name: name ?? this.name,
-      imagePath: imagePath ?? this.imagePath,
       power: power ?? this.power,
       control: control ?? this.control,
       spin: spin ?? this.spin,
       price: price ?? this.price,
       isUnlocked: isUnlocked ?? this.isUnlocked,
       rarity: rarity ?? this.rarity,
+      faceColor: faceColor ?? this.faceColor,
+      accentColor: accentColor ?? this.accentColor,
+      patternStyle: patternStyle ?? this.patternStyle,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'power': power,
+      'control': control,
+      'spin': spin,
+      'price': price,
+      'isUnlocked': isUnlocked,
+      'rarity': rarity.name,
+      'faceColor': faceColor.value,
+      'accentColor': accentColor.value,
+      'patternStyle': patternStyle,
+    };
+  }
+
+  factory PaddleData.fromJson(Map<String, dynamic> json) {
+    return PaddleData(
+      id: json['id'] ?? 'starter_paddle',
+      name: json['name'] ?? 'Common Paddle I',
+      power: json['power'] ?? 40,
+      control: json['control'] ?? 60,
+      spin: json['spin'] ?? 30,
+      price: json['price'] ?? 0,
+      isUnlocked: json['isUnlocked'] ?? true,
+      rarity: PaddleRarity.values.firstWhere(
+        (r) => r.name == json['rarity'],
+        orElse: () => PaddleRarity.common,
+      ),
+      faceColor: json['faceColor'] != null ? Color(json['faceColor']) : null,
+      accentColor:
+          json['accentColor'] != null ? Color(json['accentColor']) : null,
+      patternStyle: json['patternStyle'] ?? 'plain',
     );
   }
 }
 
-// ---------------------------------------------------------------------------
-// CHARACTER STYLE MODEL
-// ---------------------------------------------------------------------------
-class CharacterStyleData {
-  final String name;
-  final Color outfitPrimary;
-  final Color outfitSecondary;
-  final double speedMultiplier;
-
-  CharacterStyleData({
-    required this.name,
-    required this.outfitPrimary,
-    required this.outfitSecondary,
-    this.speedMultiplier = 1.0,
-  });
-}
-
-// ---------------------------------------------------------------------------
-// DEFAULT GAME CONSTANTS
-// ---------------------------------------------------------------------------
-final List<CharacterStyleData> kCharacterStyles = [
-  CharacterStyleData(
-    name: 'Neon Rebel',
-    outfitPrimary: const Color(0xFFFACC15),
-    outfitSecondary: const Color(0xFFDC2626),
-    speedMultiplier: 1.0,
-  ),
-  CharacterStyleData(
-    name: 'Cyber Dinker',
-    outfitPrimary: const Color(0xFF38BDF8),
-    outfitSecondary: const Color(0xFF818CF8),
-    speedMultiplier: 1.1,
-  ),
-];
-
+// ==========================================
+// DEFAULT FICTIONAL PADDLES CATALOG
+// ==========================================
 final List<PaddleData> kDefaultPaddles = [
-  // --- STARTER GEAR ---
   PaddleData(
     id: 'starter_paddle',
-    name: 'Street Woodie',
-    imagePath: 'assets/paddles/starter_paddle.png',
+    name: 'Common Paddle I',
     power: 40,
     control: 60,
     spin: 30,
     price: 0,
     isUnlocked: true,
     rarity: PaddleRarity.common,
+    faceColor: const Color(0xFF4B5563),
+    accentColor: const Color(0xFF9CA3AF),
+    patternStyle: 'stripes',
   ),
-
-  // --- COMMON TIER ---
   PaddleData(
-    id: 'onix_z5',
-    name: 'Onix Graphite Z5',
-    imagePath: 'assets/paddles/onix_z5.png',
+    id: 'street_striker',
+    name: 'Street Striker',
     power: 71,
     control: 72,
     spin: 49,
     price: 250,
     isUnlocked: false,
     rarity: PaddleRarity.common,
+    faceColor: const Color(0xFF374151),
+    accentColor: const Color(0xFFF59E0B),
+    patternStyle: 'lightning',
   ),
   PaddleData(
-    id: 'head_radical_pro',
-    name: 'HEAD Radical Pro',
-    imagePath: 'assets/paddles/head_radical_pro.png',
-    power: 69,
-    control: 76,
-    spin: 66,
+    id: 'alley_driver',
+    name: 'Alley Driver',
+    power: 74,
+    control: 70,
+    spin: 55,
     price: 300,
     isUnlocked: false,
     rarity: PaddleRarity.common,
+    faceColor: const Color(0xFF1F2937),
+    accentColor: const Color(0xFF10B981),
+    patternStyle: 'cross',
   ),
   PaddleData(
-    id: 'paddletek_ts5',
-    name: 'Paddletek Bantam TS-5',
-    imagePath: 'assets/paddles/paddletek_ts5.png',
-    power: 73,
-    control: 68,
-    spin: 59,
-    price: 350,
-    isUnlocked: false,
-    rarity: PaddleRarity.common,
-  ),
-  PaddleData(
-    id: 'franklin_ben_johns',
-    name: 'Franklin Ben Johns 16mm',
-    imagePath: 'assets/paddles/franklin_ben_johns.png',
-    power: 69,
-    control: 71,
-    spin: 66,
-    price: 400,
-    isUnlocked: false,
-    rarity: PaddleRarity.common,
-  ),
-  PaddleData(
-    id: 'crbn_genesis_1',
-    name: 'CRBN TruFoam Genesis 1',
-    imagePath: 'assets/paddles/crbn_genesis_1.png',
-    power: 74,
-    control: 56,
-    spin: 89,
+    id: 'forest_edge',
+    name: 'Forest Edge',
+    power: 79,
+    control: 83,
+    spin: 78,
     price: 450,
     isUnlocked: false,
-    rarity: PaddleRarity.common,
+    rarity: PaddleRarity.uncommon,
+    faceColor: const Color(0xFF15803D),
+    accentColor: const Color(0xFF86EFAC),
+    patternStyle: 'ring',
   ),
-
-  // --- RARE TIER ---
   PaddleData(
-    id: 'vatic_prism_flash',
-    name: 'Vatic Pro Prism Flash 16mm',
-    imagePath: 'assets/paddles/vatic_prism_flash.png',
-    power: 65,
-    control: 76,
-    spin: 83,
+    id: 'emerald_blitz',
+    name: 'Emerald Blitz',
+    power: 82,
+    control: 80,
+    spin: 81,
     price: 600,
     isUnlocked: false,
-    rarity: PaddleRarity.rare,
+    rarity: PaddleRarity.uncommon,
+    faceColor: const Color(0xFF047857),
+    accentColor: const Color(0xFF34D399),
+    patternStyle: 'lightning',
   ),
   PaddleData(
-    id: 'engage_pursuit_maxx',
-    name: 'Engage Pursuit MAXX MX 6.0',
-    imagePath: 'assets/paddles/engage_pursuit_maxx.png',
-    power: 70,
-    control: 75,
-    spin: 66,
-    price: 750,
-    isUnlocked: false,
-    rarity: PaddleRarity.rare,
-  ),
-  PaddleData(
-    id: 'engage_pursuit_graphite',
-    name: 'Engage Pursuit MX 6.0',
-    imagePath: 'assets/paddles/engage_pursuit_graphite.png',
-    power: 69,
-    control: 74,
-    spin: 69,
-    price: 800,
-    isUnlocked: false,
-    rarity: PaddleRarity.rare,
-  ),
-  PaddleData(
-    id: 'crbn_genesis_2',
-    name: 'CRBN TruFoam Genesis 2',
-    imagePath: 'assets/paddles/crbn_genesis_2.png',
-    power: 71,
-    control: 72,
-    spin: 86,
+    id: 'violet_shadow',
+    name: 'Violet Shadow',
+    power: 86,
+    control: 88,
+    spin: 89,
     price: 900,
     isUnlocked: false,
-    rarity: PaddleRarity.rare,
+    rarity: PaddleRarity.epic,
+    faceColor: const Color(0xFF6B21A8),
+    accentColor: const Color(0xFFE9D5FF),
+    patternStyle: 'ring',
   ),
   PaddleData(
-    id: 'crbn_waves_1',
-    name: 'CRBN TruFoam Waves 1',
-    imagePath: 'assets/paddles/crbn_waves_1.png',
-    power: 78,
-    control: 59,
-    spin: 86,
-    price: 950,
+    id: 'shadow_spin',
+    name: 'Shadow Spin',
+    power: 88,
+    control: 85,
+    spin: 92,
+    price: 1200,
     isUnlocked: false,
-    rarity: PaddleRarity.rare,
+    rarity: PaddleRarity.epic,
+    faceColor: const Color(0xFF581C87),
+    accentColor: const Color(0xFFC084FC),
+    patternStyle: 'swirl',
   ),
   PaddleData(
-    id: 'ronbus_r1_nova',
-    name: 'Ronbus R1 Nova',
-    imagePath: 'assets/paddles/ronbus_r1_nova.png',
-    power: 72,
-    control: 65,
-    spin: 86,
-    price: 1100,
-    isUnlocked: false,
-    rarity: PaddleRarity.rare,
-  ),
-  PaddleData(
-    id: 'gearbox_cx14e',
-    name: 'Gearbox CX14E Ultimate Power',
-    imagePath: 'assets/paddles/gearbox_cx14e.png',
-    power: 81,
-    control: 62,
-    spin: 80,
-    price: 1250,
-    isUnlocked: false,
-    rarity: PaddleRarity.rare,
-  ),
-  PaddleData(
-    id: 'selkirk_luxx_invikta',
-    name: 'Selkirk LUXX Control Air',
-    imagePath: 'assets/paddles/selkirk_luxx_invikta.png',
-    power: 59,
-    control: 79,
-    spin: 86,
-    price: 1400,
-    isUnlocked: false,
-    rarity: PaddleRarity.rare,
-  ),
-
-  // --- EPIC / LEGENDARY TIER ---
-  PaddleData(
-    id: 'joola_perseus_pro_4',
-    name: 'JOOLA Perseus Pro IV 16mm',
-    imagePath: 'assets/paddles/joola_perseus_pro_4.png',
-    power: 80,
-    control: 65,
-    spin: 84,
+    id: 'golden_smash',
+    name: 'Golden Smash',
+    power: 92,
+    control: 90,
+    spin: 91,
     price: 1800,
     isUnlocked: false,
     rarity: PaddleRarity.legendary,
+    faceColor: const Color(0xFFB45309),
+    accentColor: const Color(0xFFFDE047),
+    patternStyle: 'crown',
   ),
   PaddleData(
-    id: 'joola_perseus_pro_5',
-    name: 'JOOLA Perseus Pro V 16mm',
-    imagePath: 'assets/paddles/joola_perseus_pro_5.png',
-    power: 77,
-    control: 67,
-    spin: 90,
-    price: 2200,
-    isUnlocked: false,
-    rarity: PaddleRarity.legendary,
-  ),
-  PaddleData(
-    id: 'honolulu_j6cr',
-    name: 'Honolulu J6CR Crystal Blue',
-    imagePath: 'assets/paddles/honolulu_j6cr.png',
-    power: 78,
-    control: 67,
-    spin: 95,
-    price: 2400,
-    isUnlocked: false,
-    rarity: PaddleRarity.legendary,
-  ),
-  PaddleData(
-    id: 'honolulu_j6nf',
-    name: 'Honolulu J6NF Endurance',
-    imagePath: 'assets/paddles/honolulu_j6nf.png',
-    power: 77,
-    control: 71,
-    spin: 90,
+    id: 'solar_edge',
+    name: 'Solar Edge',
+    power: 90,
+    control: 94,
+    spin: 93,
     price: 2500,
     isUnlocked: false,
     rarity: PaddleRarity.legendary,
+    faceColor: const Color(0xFFD97706),
+    accentColor: const Color(0xFFFEF08A),
+    patternStyle: 'sunburst',
   ),
   PaddleData(
-    id: 'selkirk_power_air',
-    name: 'Selkirk Vanguard Power Air',
-    imagePath: 'assets/paddles/selkirk_power_air.png',
-    power: 81,
-    control: 56,
-    spin: 90,
-    price: 2800,
+    id: 'crimson_fury',
+    name: 'Crimson Fury',
+    power: 95,
+    control: 92,
+    spin: 96,
+    price: 4000,
     isUnlocked: false,
-    rarity: PaddleRarity.legendary,
+    rarity: PaddleRarity.mythic,
+    faceColor: const Color(0xFF991B1B),
+    accentColor: const Color(0xFFFCA5A5),
+    patternStyle: 'flame',
   ),
   PaddleData(
-    id: 'sixzero_black_opal',
-    name: 'Six Zero Black Opal',
-    imagePath: 'assets/paddles/sixzero_black_opal.png',
-    power: 85,
-    control: 59,
-    spin: 88,
-    price: 3200,
+    id: 'celestial_wave',
+    name: 'Celestial Wave',
+    power: 97,
+    control: 96,
+    spin: 97,
+    price: 6500,
     isUnlocked: false,
-    rarity: PaddleRarity.legendary,
+    rarity: PaddleRarity.divine,
+    faceColor: const Color(0xFF0369A1),
+    accentColor: const Color(0xFFBAE6FD),
+    patternStyle: 'wave',
   ),
   PaddleData(
-    id: 'sixzero_coral_pro_elongated',
-    name: 'Six Zero Coral Pro Elongated',
-    imagePath: 'assets/paddles/sixzero_coral_pro_elongated.png',
-    power: 77,
-    control: 67,
-    spin: 92,
-    price: 3500,
+    id: 'eternal_bloom',
+    name: 'Eternal Bloom',
+    power: 99,
+    control: 98,
+    spin: 99,
+    price: 10000,
     isUnlocked: false,
-    rarity: PaddleRarity.legendary,
-  ),
-  PaddleData(
-    id: 'sixzero_coral_pro_widebody',
-    name: 'Six Zero Coral Pro Widebody',
-    imagePath: 'assets/paddles/sixzero_coral_pro_widebody.png',
-    power: 71,
-    control: 82,
-    spin: 92,
-    price: 3800,
-    isUnlocked: false,
-    rarity: PaddleRarity.legendary,
-  ),
-
-  // --- BLACK MARKET EXCLUSIVES ---
-  PaddleData(
-    id: 'diadem_vice',
-    name: 'Diadem VICE (EVA Concept)',
-    imagePath: 'assets/paddles/diadem_vice.png',
-    power: 70,
-    control: 71,
-    spin: 76,
-    price: 4500,
-    isUnlocked: false,
-    rarity: PaddleRarity.legendary,
-  ),
-  PaddleData(
-    id: 'prokennex_black_ace',
-    name: 'ProKennex Kinetic Black Ace',
-    imagePath: 'assets/paddles/prokennex_black_ace.png',
-    power: 86,
-    control: 56,
-    spin: 83,
-    price: 5200,
-    isUnlocked: false,
-    rarity: PaddleRarity.legendary,
-  ),
-  PaddleData(
-    id: 'joola_mod_ta15',
-    name: 'JOOLA Perseus Mod TA-15 (Banned)',
-    imagePath: 'assets/paddles/joola_mod_ta15.png',
-    power: 86,
-    control: 61,
-    spin: 90,
-    price: 6000,
-    isUnlocked: false,
-    rarity: PaddleRarity.legendary,
+    rarity: PaddleRarity.eternal,
+    faceColor: const Color(0xFFBE185D),
+    accentColor: const Color(0xFFFBCFE8),
+    patternStyle: 'star',
   ),
 ];

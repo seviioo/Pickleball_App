@@ -18,7 +18,7 @@ class PerspectiveCourtPainter extends CustomPainter {
   final bool isAiShrunk;
   final String? timingFeedback;
   final Color playerColor;
-  final PaddleData? playerPaddle; // <-- EQUIPPED PADDLE PASSED HERE
+  final PaddleData? playerPaddle; // Equipped player paddle
   final bool isUltimateActive;
   final CharacterAnimState playerAnimState;
   final CharacterAnimState aiAnimState;
@@ -93,7 +93,6 @@ class PerspectiveCourtPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final bool isLandscape = size.width > size.height;
-
     final darkAsphaltPaint = Paint()
       ..color = const Color(0xFF09090B)
       ..style = PaintingStyle.fill;
@@ -114,11 +113,9 @@ class PerspectiveCourtPainter extends CustomPainter {
         isLandscape ? size.width * 0.60 : size.width * 0.85;
     final double maxCourtHeight =
         isLandscape ? size.height * 0.85 : size.height * 0.80;
-
     final double courtHeight = min(maxCourtHeight, maxCourtWidth * 1.6);
     final double topWidth = courtHeight * 0.35;
     final double bottomWidth = courtHeight * 0.65;
-
     final double centerY = size.height * 0.50;
     final double topY = centerY - (courtHeight * 0.45);
     final double bottomY = centerY + (courtHeight * 0.45);
@@ -143,7 +140,6 @@ class PerspectiveCourtPainter extends CustomPainter {
       ..lineTo(perspectiveTransform(-1.0, 1.0).dx,
           perspectiveTransform(-1.0, 1.0).dy)
       ..close();
-
     canvas.drawPath(
       courtPath,
       Paint()
@@ -162,7 +158,6 @@ class PerspectiveCourtPainter extends CustomPainter {
       ..lineTo(perspectiveTransform(-1.0, 0.32).dx,
           perspectiveTransform(-1.0, 0.32).dy)
       ..close();
-
     canvas.drawPath(
       kitchenPath,
       Paint()
@@ -175,7 +170,6 @@ class PerspectiveCourtPainter extends CustomPainter {
       ..color = const Color(0xFFF4F4F5)
       ..strokeWidth = 3.5
       ..style = PaintingStyle.stroke;
-
     canvas.drawPath(courtPath, linePaint);
 
     Offset netLeft = perspectiveTransform(-1.0, 0.0);
@@ -195,14 +189,12 @@ class PerspectiveCourtPainter extends CustomPainter {
     final Offset netTopLeft = Offset(netLeft.dx - 3, netLeft.dy - netHeightPx);
     final Offset netTopRight =
         Offset(netRight.dx + 3, netRight.dy - netHeightPx);
-
     final Path netMeshPath = Path()
       ..moveTo(netLeft.dx, netLeft.dy)
       ..lineTo(netRight.dx, netRight.dy)
       ..lineTo(netTopRight.dx, netTopRight.dy)
       ..lineTo(netTopLeft.dx, netTopLeft.dy)
       ..close();
-
     canvas.drawPath(
         netMeshPath, Paint()..color = Colors.black.withOpacity(0.55));
     canvas.drawLine(
@@ -213,12 +205,10 @@ class PerspectiveCourtPainter extends CustomPainter {
         ..strokeWidth = 4.0
         ..strokeCap = StrokeCap.round,
     );
-
     final Paint postPaint = Paint()
       ..color = const Color(0xFF71717A)
       ..strokeWidth = 6.0
       ..strokeCap = StrokeCap.round;
-
     canvas.drawLine(netLeft,
         Offset(netLeft.dx - 2, netLeft.dy - netHeightPx * 1.05), postPaint);
     canvas.drawLine(netRight,
@@ -230,7 +220,6 @@ class PerspectiveCourtPainter extends CustomPainter {
       Color orbColor = const Color(0xFFF97316);
       if (orbType == OrbType.shrinkRay) orbColor = const Color(0xFFA855F7);
       if (orbType == OrbType.doublePoints) orbColor = const Color(0xFFEAB308);
-
       canvas.drawCircle(
         orbPos,
         18,
@@ -253,7 +242,6 @@ class PerspectiveCourtPainter extends CustomPainter {
         height: playerReach * (bottomY - topY),
       );
       final Color ringColor = const Color(0xFFFACC15);
-
       canvas.drawOval(
         reachRect,
         Paint()
@@ -277,7 +265,6 @@ class PerspectiveCourtPainter extends CustomPainter {
       final double aw = topWidth + aprog * (bottomWidth - topWidth);
       final double rx = max(9.0, aimScatter * aw / 2);
       final double ry = rx * 0.45;
-
       canvas.drawLine(
         from,
         to,
@@ -285,7 +272,6 @@ class PerspectiveCourtPainter extends CustomPainter {
           ..color = Colors.white.withOpacity(0.16)
           ..strokeWidth = 1.5,
       );
-
       final Rect target =
           Rect.fromCenter(center: to, width: rx * 2, height: ry * 2);
       canvas.drawOval(
@@ -294,12 +280,10 @@ class PerspectiveCourtPainter extends CustomPainter {
           ..color = const Color(0xFFEF4444).withOpacity(0.20)
           ..style = PaintingStyle.fill,
       );
-
       final Paint aimStroke = Paint()
         ..color = const Color(0xFFEF4444).withOpacity(0.95)
         ..style = PaintingStyle.stroke
         ..strokeWidth = 2.0;
-
       canvas.drawOval(target, aimStroke);
       canvas.drawLine(Offset(to.dx - rx * 0.5, to.dy),
           Offset(to.dx + rx * 0.5, to.dy), aimStroke);
@@ -307,7 +291,7 @@ class PerspectiveCourtPainter extends CustomPainter {
           Offset(to.dx, to.dy + ry * 0.5), aimStroke);
     }
 
-    // AI Chibi Render (Opponent stays default red paddle)
+    // AI Chibi Render
     Offset oppPos = perspectiveTransform(opponentX, opponentY);
     _drawAnimatedChibi(
       canvas,
@@ -323,7 +307,7 @@ class PerspectiveCourtPainter extends CustomPainter {
       actionProgress: aiActionProgress,
     );
 
-    // Player Chibi Render (Uses equipped paddle design)
+    // Player Chibi Render
     Offset playerPos = perspectiveTransform(playerX, playerY);
     _drawAnimatedChibi(
       canvas,
@@ -351,7 +335,6 @@ class PerspectiveCourtPainter extends CustomPainter {
     Color ballColor = isDoublePointsActive
         ? const Color(0xFFEAB308)
         : const Color(0xFFFACC15);
-
     final double speedXY = sqrt(ballVx * ballVx + ballVy * ballVy);
     final double trailStrength = ((speedXY - 0.8) / 1.6).clamp(0.0, 1.0);
     if (trailStrength > 0 && trail.length > 1) {
@@ -365,7 +348,6 @@ class PerspectiveCourtPainter extends CustomPainter {
         );
       }
     }
-
     double shadowWidth = (20.0 - ballHeight * 6.0).clamp(6.0, 20.0);
     double shadowHeight = (10.0 - ballHeight * 3.0).clamp(3.0, 10.0);
     canvas.drawOval(
@@ -388,8 +370,8 @@ class PerspectiveCourtPainter extends CustomPainter {
     canvas.rotate(travelAngle);
     canvas.scale(stretch, 1.0 / sqrt(stretch));
     canvas.drawCircle(Offset.zero, 9.0, Paint()..color = ballColor);
-
     canvas.rotate(ballRotation - travelAngle);
+
     final Paint holePaint = Paint()..color = Colors.black45;
     canvas.drawCircle(const Offset(-2.5, -2.5), 1.1, holePaint);
     canvas.drawCircle(const Offset(2.5, -1.5), 1.1, holePaint);
@@ -478,54 +460,7 @@ class PerspectiveCourtPainter extends CustomPainter {
   Color _getPaddleColor(PaddleData? paddle, bool isGlowing) {
     if (isGlowing) return const Color(0xFFF97316);
     if (paddle == null) return const Color(0xFFEF4444);
-
-    // Map paddle ID to its distinct visual color matching shop aesthetics
-    switch (paddle.id) {
-      case 'vatic_prism_flash':
-        return const Color(0xFF1E293B); // Dark Stealth Black/Slate
-      case 'engage_pursuit_maxx':
-        return const Color(0xFF0284C7); // Deep Pursuit Blue
-      case 'engage_pursuit_graphite':
-        return const Color(0xFF334155); // Graphite Gray
-      case 'onix_z5':
-        return const Color(0xFF16A34A); // Onix Green
-      case 'head_radical_pro':
-        return const Color(0xFFEA580C); // Radical Orange
-      case 'paddletek_ts5':
-        return const Color(0xFF2563EB); // Paddletek Blue
-      case 'franklin_ben_johns':
-        return const Color(0xFFD97706); // Amber Gold
-      case 'crbn_genesis_1':
-      case 'crbn_genesis_2':
-      case 'crbn_waves_1':
-        return const Color(0xFF0F172A); // Matte Black Carbon
-      case 'ronbus_r1_nova':
-        return const Color(0xFF0D9488); // Nova Cyan
-      case 'gearbox_cx14e':
-        return const Color(0xFF475569); // Gearbox Metallic
-      case 'selkirk_luxx_invikta':
-      case 'selkirk_power_air':
-        return const Color(0xFFE11D48); // Selkirk Crimson
-      case 'joola_perseus_pro_4':
-      case 'joola_perseus_pro_5':
-      case 'joola_mod_ta15':
-        return const Color(0xFF111827); // JOOLA Tactical Black
-      case 'honolulu_j6cr':
-        return const Color(0xFF38BDF8); // Crystal Blue
-      case 'honolulu_j6nf':
-        return const Color(0xFF818CF8); // Honolulu Violet
-      case 'sixzero_black_opal':
-      case 'sixzero_coral_pro_elongated':
-      case 'sixzero_coral_pro_widebody':
-        return const Color(0xFF4C1D95); // Coral Purple/Opal
-      case 'diadem_vice':
-        return const Color(0xFFEC4899); // VICE Neon Pink
-      case 'prokennex_black_ace':
-        return const Color(0xFF18181B); // Black Ace Dark
-      case 'starter_paddle':
-      default:
-        return const Color(0xFFEF4444); // Fallback Red
-    }
+    return paddle.rarity.color;
   }
 
   void _drawAnimatedChibi(
@@ -599,7 +534,6 @@ class PerspectiveCourtPainter extends CustomPainter {
     final double runBob = -sin(walkPhase * 2.0).abs() * 3.2 * m;
     final double breathe = sin(animClock * 3.0) * 0.8 * (1.0 - m);
     final double bodyY = runBob + breathe - jump + crouch;
-
     double lean = moveX * 0.16 * m;
     if (acting) {
       final double swingLean = sin(pi * p) * 0.16;
@@ -718,7 +652,7 @@ class PerspectiveCourtPainter extends CustomPainter {
     canvas.rotate(paddleAngle);
     canvas.scale(paddleScale);
 
-    // Paddle Handle / Grip
+    // Grip Handle
     canvas.drawRRect(
       RRect.fromRectAndRadius(
         Rect.fromCenter(center: const Offset(0, 4), width: 3.5, height: 9),
@@ -727,12 +661,7 @@ class PerspectiveCourtPainter extends CustomPainter {
       Paint()..color = const Color(0xFF3F3F46),
     );
 
-    // Paddle Face / Blade (Rendered with equipped paddle's design/color)
-    final Color paddleFaceColor = isPlayer
-        ? _getPaddleColor(equippedPaddle, isGlowing)
-        : const Color(0xFFEF4444);
-
-    // Outer Edge Guard
+    // Outer Rim
     canvas.drawRRect(
       RRect.fromRectAndRadius(
         Rect.fromCenter(center: const Offset(0, -8), width: 16, height: 20),
@@ -741,7 +670,12 @@ class PerspectiveCourtPainter extends CustomPainter {
       Paint()..color = const Color(0xFF18181B),
     );
 
-    // Main Paddle Face
+    // Main Face
+    final Color paddleFaceColor = isPlayer
+        ? (equippedPaddle?.faceColor ??
+            _getPaddleColor(equippedPaddle, isGlowing))
+        : const Color(0xFFEF4444);
+
     canvas.drawRRect(
       RRect.fromRectAndRadius(
         Rect.fromCenter(center: const Offset(0, -8), width: 14, height: 18),
@@ -750,12 +684,24 @@ class PerspectiveCourtPainter extends CustomPainter {
       Paint()..color = paddleFaceColor,
     );
 
-    // Brand / Logo Emblem Highlight on Paddle Face
-    canvas.drawCircle(
-      const Offset(0, -8),
-      2.5,
-      Paint()..color = Colors.white.withOpacity(0.85),
-    );
+    // Pattern & Rarity Outline
+    if (isPlayer && equippedPaddle != null) {
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromCenter(center: const Offset(0, -8), width: 14, height: 18),
+          const Radius.circular(4.5),
+        ),
+        Paint()
+          ..color = equippedPaddle.rarity.color
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.2,
+      );
+      canvas.drawCircle(
+        const Offset(0, -8),
+        2.5,
+        Paint()..color = equippedPaddle.accentColor.withOpacity(0.8),
+      );
+    }
 
     canvas.restore();
     canvas.restore();

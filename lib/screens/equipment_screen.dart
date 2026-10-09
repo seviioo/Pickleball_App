@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/game_models.dart';
+import '../painters/paddle_preview_painter.dart';
 import '../services/storage_service.dart';
 
 class EquipmentScreen extends StatefulWidget {
@@ -25,7 +26,6 @@ class _EquipmentScreenState extends State<EquipmentScreen> {
     final paddles = await StorageService.getPaddles();
     final equipped = await StorageService.getEquippedPaddle();
     final coins = await StorageService.getCoins();
-
     if (mounted) {
       setState(() {
         _paddles = paddles;
@@ -47,7 +47,6 @@ class _EquipmentScreenState extends State<EquipmentScreen> {
       await StorageService.unlockPaddle(paddle.id);
       await StorageService.setEquippedPaddle(paddle);
       await _loadData();
-
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -121,7 +120,6 @@ class _EquipmentScreenState extends State<EquipmentScreen> {
               itemBuilder: (context, index) {
                 final paddle = _paddles[index];
                 final isEquipped = _equippedPaddle?.id == paddle.id;
-
                 return Container(
                   margin: const EdgeInsets.only(bottom: 16),
                   padding: const EdgeInsets.all(16),
@@ -143,23 +141,18 @@ class _EquipmentScreenState extends State<EquipmentScreen> {
                       Row(
                         children: [
                           Container(
-                            padding: const EdgeInsets.all(8),
+                            width: 64,
+                            height: 64,
+                            alignment: Alignment.center,
                             decoration: BoxDecoration(
                               color: paddle.rarity.color.withOpacity(0.15),
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(color: paddle.rarity.color),
                             ),
-                            child: Image.asset(
-                              paddle.imagePath,
-                              width: 48,
-                              height: 48,
-                              fit: BoxFit.contain,
-                              errorBuilder: (context, error, stackTrace) =>
-                                  Icon(
-                                Icons.sports_tennis,
-                                color: paddle.rarity.color,
-                                size: 32,
-                              ),
+                            child: PaddlePreviewWidget(
+                              paddle: paddle,
+                              width: 52,
+                              height: 52,
                             ),
                           ),
                           const SizedBox(width: 16),

@@ -1,7 +1,7 @@
 import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 import '../game/pickleball_game.dart';
-import '../models/game_models.dart' hide CharacterAnimState, OrbType;
+import '../models/game_models.dart' hide CharacterAnimState;
 import '../painters/perspective_court_painter.dart';
 import 'lobby_screen.dart';
 import 'match_summary_screen.dart';
@@ -500,7 +500,7 @@ class _CourtGameplayScreenState extends State<CourtGameplayScreen> {
                       },
                     ),
                   ),
-                  
+
                   // Dynamic DRAG-TO-AIM Action Button Controls
                   Positioned(
                     right: isLandscape ? 36 : 20,
@@ -509,7 +509,8 @@ class _CourtGameplayScreenState extends State<CourtGameplayScreen> {
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        if (isPlayerServing && gameState == GameMatchState.ready)
+                        if (isPlayerServing &&
+                            gameState == GameMatchState.ready)
                           Padding(
                             padding: const EdgeInsets.only(bottom: 12),
                             child: _buildAimableButton(
@@ -624,7 +625,8 @@ class AimableShotButton extends StatefulWidget {
 
 class _AimableShotButtonState extends State<AimableShotButton> {
   Offset _dragOffset = Offset.zero;
-  final double _maxDragRadius = 35.0; // The threshold before normal capping kicks in
+  final double _maxDragRadius =
+      35.0; // The threshold before normal capping kicks in
 
   void _handleAim(Offset localPosition, Size buttonSize) {
     // Find the center of the button relative to its own size
@@ -647,7 +649,7 @@ class _AimableShotButtonState extends State<AimableShotButton> {
   void _resetAndShoot() {
     widget.onShoot();
     setState(() {
-      _dragOffset = Offset.zero; 
+      _dragOffset = Offset.zero;
     });
     // We purposefully do NOT reset game aim here so the shot remembers the target
   }
@@ -661,8 +663,10 @@ class _AimableShotButtonState extends State<AimableShotButton> {
     final bool isPill = widget.width != null && widget.width! > finalHeight;
 
     return GestureDetector(
-      onPanStart: (details) => _handleAim(details.localPosition, Size(finalWidth, finalHeight)),
-      onPanUpdate: (details) => _handleAim(details.localPosition, Size(finalWidth, finalHeight)),
+      onPanStart: (details) =>
+          _handleAim(details.localPosition, Size(finalWidth, finalHeight)),
+      onPanUpdate: (details) =>
+          _handleAim(details.localPosition, Size(finalWidth, finalHeight)),
       onPanEnd: (_) => _resetAndShoot(),
       onPanCancel: () {
         setState(() => _dragOffset = Offset.zero);
@@ -677,7 +681,9 @@ class _AimableShotButtonState extends State<AimableShotButton> {
         width: finalWidth,
         height: finalHeight,
         decoration: BoxDecoration(
-          color: widget.isPrimary ? const Color(0xFFDC2626) : const Color(0xFF27272A),
+          color: widget.isPrimary
+              ? const Color(0xFFDC2626)
+              : const Color(0xFF27272A),
           borderRadius: BorderRadius.circular(isPill ? 16 : finalWidth / 2),
           border: Border.all(
             color: widget.isPrimary ? const Color(0xFFFACC15) : Colors.white38,
