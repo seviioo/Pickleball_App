@@ -834,6 +834,8 @@ webSocketServer.on('connection', async (socket, request) => {
         startServerShot(state, socket.playerId, {
           type: String(message.shotType || 'DRIVE'),
           x: message.x,
+          targetX: message.targetX,
+          targetY: message.targetY,
         });
       }
     } catch (error) {
