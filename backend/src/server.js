@@ -468,11 +468,16 @@ const NET_CLEARANCE = 0.08;
         type === 'LOB' ? 0.3 :
         type === 'ROLL' || type === 'SLICE' ? -0.8 :
         serving ? 0.0 : 0.35;
-      const targetY = isHost ? -targetDepth : targetDepth;
-      const requestedX = Number.isFinite(Number(shotType.x))
-        ? Number(shotType.x)
+      const requestedX = Number.isFinite(Number(shotType.targetX))
+        ? Number(shotType.targetX)
+        : Number.isFinite(Number(shotType.x))
+          ? Number(shotType.x)
         : (isHost ? px : -px);
       const targetX = clamp(isHost ? requestedX : -requestedX, -0.92, 0.92);
+      const requestedY = Number(shotType.targetY);
+      const targetY = Number.isFinite(requestedY)
+        ? clamp(isHost ? requestedY : -requestedY, -0.92, 0.92)
+        : (isHost ? -targetDepth : targetDepth);
       state.ballX = px;
       state.ballY = py;
       // Give serves a higher launch so the initial flight clears the net.
@@ -824,6 +829,8 @@ webSocketServer.on('connection', async (socket, request) => {
       } else if (message.type === 'SHOT') {
         startServerShot(state, socket.playerId, {
           type: String(message.shotType || 'DRIVE'),
+          targetX: message.targetX,
+          targetY: message.targetY,
           x: message.x,
         });
       }

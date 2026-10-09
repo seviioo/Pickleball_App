@@ -153,13 +153,22 @@ class _MultiplayerCourtScreenState extends State<MultiplayerCourtScreen> {
   }
 
   void _triggerShot(String type) {
-    if (isGameOver || _paused) return;
+    if (isGameOver ||
+        _paused ||
+        !_hasAuthoritativeState ||
+        (matchPhase == 'ready' && !isPlayerServing) ||
+        (matchPhase != 'ready' && matchPhase != 'rally')) {
+      return;
+    }
+    final targetY =
+        (_aimDirection.dy * 0.35 - 0.65).clamp(-0.92, -0.20).toDouble();
     SocketService.instance.sendEvent('SHOT', {
       'shotType': type,
-      'x': _aimDirection.dx == 0 ? myX : _aimDirection.dx,
+      'targetX': _aimDirection.dx.clamp(-0.92, 0.92).toDouble(),
+      'targetY': targetY,
       'y': myY,
       'aimX': _aimDirection.dx,
-      'aimY': _aimDirection.dy,
+      'aimY': targetY,
     });
   }
 
@@ -454,7 +463,9 @@ class _MultiplayerCourtScreenState extends State<MultiplayerCourtScreen> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    if (matchPhase == 'ready' && isPlayerServing)
+                    if (_hasAuthoritativeState &&
+                        matchPhase == 'ready' &&
+                        isPlayerServing)
                       Padding(
                         padding: const EdgeInsets.only(bottom: 12),
                         child: _buildAimableButton(
