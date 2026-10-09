@@ -311,14 +311,14 @@ class _MultiplayerCourtScreenState extends State<MultiplayerCourtScreen> {
             // Header Scoreboard
             Positioned(
               top: isLandscape ? 8 : 12,
-              left: isLandscape ? 150 : 12,
-              right: isLandscape ? 150 : 12,
+              left: isLandscape ? 150 : 124,
+              right: isLandscape ? 150 : 8,
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Container(
                     padding: EdgeInsets.symmetric(
-                      horizontal: isLandscape ? 12 : 16,
+                      horizontal: isLandscape ? 12 : 10,
                       vertical: isLandscape ? 4 : 8,
                     ),
                     decoration: BoxDecoration(
@@ -330,14 +330,18 @@ class _MultiplayerCourtScreenState extends State<MultiplayerCourtScreen> {
                     child: Row(
                       children: [
                         const Icon(Icons.radio,
-                            color: Color(0xFFFACC15), size: 20),
-                        const SizedBox(width: 8),
-                        Text(
-                          '${widget.userName}: $myScore  |  ${widget.opponentName}: $opponentScore',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: isLandscape ? 14 : 16,
-                            fontWeight: FontWeight.w900,
+                            color: Color(0xFFFACC15), size: 18),
+                        const SizedBox(width: 6),
+                        Flexible(
+                          child: Text(
+                            '${widget.userName}: $myScore  |  ${widget.opponentName}: $opponentScore',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: isLandscape ? 14 : 13,
+                              fontWeight: FontWeight.w900,
+                            ),
                           ),
                         ),
                       ],
@@ -349,7 +353,7 @@ class _MultiplayerCourtScreenState extends State<MultiplayerCourtScreen> {
 
             // Status Banner
             Positioned(
-              top: isLandscape ? 54 : 68,
+              top: isLandscape ? 54 : 82,
               left: 0,
               right: 0,
               child: Center(
