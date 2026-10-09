@@ -372,6 +372,8 @@ const NET_CLEARANCE = 0.08;
         spin: 0,
         effectiveGravity: GRAVITY,
         bounceCount: 0,
+        landingTargetX: null,
+        landingTargetY: null,
         serveInFlight: false,
         lastHitBy: hostId,
         servingPlayerId: hostId,
@@ -410,6 +412,8 @@ const NET_CLEARANCE = 0.08;
       state.spin = 0;
       state.effectiveGravity = GRAVITY;
       state.bounceCount = 0;
+      state.landingTargetX = null;
+      state.landingTargetY = null;
       state.serveInFlight = false;
       state.hostX = 0;
       state.hostY = winnerId === state.hostId ? 1.05 : 0.75;
@@ -518,6 +522,8 @@ const NET_CLEARANCE = 0.08;
       state.spin = spin;
       state.effectiveGravity = effectiveGravity;
       state.bounceCount = 0;
+      state.landingTargetX = targetX;
+      state.landingTargetY = targetY;
       state.serveInFlight = serving;
       state.lastHitBy = playerId;
       state.phase = 'rally';
@@ -625,6 +631,11 @@ const NET_CLEARANCE = 0.08;
         state.ballHeight = 0;
         state.bounceCount += 1;
         if (state.bounceCount === 1) {
+          if (Number.isFinite(state.landingTargetX) &&
+              Number.isFinite(state.landingTargetY)) {
+            state.ballX = state.landingTargetX;
+            state.ballY = state.landingTargetY;
+          }
           const outOfBounds = Math.abs(state.ballX) > 1.02 ||
             Math.abs(state.ballY) > 1.02;
           const wrongSide = state.lastHitBy === state.hostId
