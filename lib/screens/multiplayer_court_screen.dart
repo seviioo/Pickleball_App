@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import '../game/pickleball_game.dart' as game;
 import '../models/game_models.dart';
 import '../painters/perspective_court_painter.dart';
@@ -9,12 +10,73 @@ import 'court_gameplay_screen.dart';
 import 'lobby_screen.dart';
 import 'match_summary_screen.dart';
 
+class _CourtFrame {
+  final double ballX;
+  final double ballY;
+  final double ballHeight;
+  final double ballVx;
+  final double ballVy;
+  final double ballVz;
+  final double ballRotation;
+  final double myX;
+  final double myY;
+  final double opponentX;
+  final double opponentY;
+  final double playerActionProgress;
+  final double opponentActionProgress;
+
+  const _CourtFrame({
+    required this.ballX,
+    required this.ballY,
+    required this.ballHeight,
+    required this.ballVx,
+    required this.ballVy,
+    required this.ballVz,
+    required this.ballRotation,
+    required this.myX,
+    required this.myY,
+    required this.opponentX,
+    required this.opponentY,
+    required this.playerActionProgress,
+    required this.opponentActionProgress,
+  });
+
+  factory _CourtFrame.interpolate(
+    _CourtFrame previous,
+    _CourtFrame current,
+    double progress,
+  ) {
+    double lerp(double from, double to) => from + (to - from) * progress;
+
+    return _CourtFrame(
+      ballX: lerp(previous.ballX, current.ballX),
+      ballY: lerp(previous.ballY, current.ballY),
+      ballHeight: lerp(previous.ballHeight, current.ballHeight),
+      ballVx: lerp(previous.ballVx, current.ballVx),
+      ballVy: lerp(previous.ballVy, current.ballVy),
+      ballVz: lerp(previous.ballVz, current.ballVz),
+      ballRotation: lerp(previous.ballRotation, current.ballRotation),
+      myX: lerp(previous.myX, current.myX),
+      myY: lerp(previous.myY, current.myY),
+      opponentX: lerp(previous.opponentX, current.opponentX),
+      opponentY: lerp(previous.opponentY, current.opponentY),
+      playerActionProgress:
+          lerp(previous.playerActionProgress, current.playerActionProgress),
+      opponentActionProgress: lerp(
+        previous.opponentActionProgress,
+        current.opponentActionProgress,
+      ),
+    );
+  }
+}
+
 class MultiplayerCourtScreen extends StatefulWidget {
   final String userName;
   final CharacterStyleData characterStyle;
   final String roomCode;
   final bool isHost;
   final String opponentName;
+  final PaddleData paddle;
 
   const MultiplayerCourtScreen({
     super.key,
@@ -23,13 +85,15 @@ class MultiplayerCourtScreen extends StatefulWidget {
     required this.roomCode,
     required this.isHost,
     required this.opponentName,
+    required this.paddle,
   });
 
   @override
   State<MultiplayerCourtScreen> createState() => _MultiplayerCourtScreenState();
 }
 
-class _MultiplayerCourtScreenState extends State<MultiplayerCourtScreen> {
+class _MultiplayerCourtScreenState extends State<MultiplayerCourtScreen>
+    with SingleTickerProviderStateMixin {
   // Synchronized Player Coordinates
   double myX = 0.0;
   double myY = 0.85;
@@ -52,6 +116,7 @@ class _MultiplayerCourtScreenState extends State<MultiplayerCourtScreen> {
   String matchPhase = 'connecting';
   String matchStatus = 'STREET SERVE READY';
   bool isPlayerServing = true;
+  bool ballInReach = false;
   String playerAnimState = 'idle';
   String opponentAnimState = 'idle';
   double playerActionProgress = 1;
@@ -59,17 +124,72 @@ class _MultiplayerCourtScreenState extends State<MultiplayerCourtScreen> {
   Offset _aimDirection = Offset.zero;
   bool _paused = false;
   double _animClock = 0;
-  final PaddleData _playerPaddle = PaddleData.starter();
+  PaddleData get _playerPaddle => widget.paddle;
   bool _matchResultSubmitted = false;
   Offset _movementDirection = Offset.zero;
   Timer? _movementTimer;
+  late final Ticker _renderTicker;
+  final Stopwatch _renderClock = Stopwatch();
+  _CourtFrame? _previousFrame;
+  _CourtFrame? _latestFrame;
+  Duration _latestFrameAt = Duration.zero;
+
+  static const Duration _snapshotInterval = Duration(milliseconds: 50);
+  double get _playerReach => 0.30 + (_playerPaddle.control / 100.0) * 0.10;
+  double get _aimPreviewX {
+    final dx = _aimDirection.dx;
+    if (matchPhase == 'ready') {
+      return (dx.abs() > 0.25 ? dx * 0.6 : 0.0).clamp(-0.7, 0.7).toDouble();
+    }
+    return dx.abs() > 0.25
+        ? (dx.sign * (0.35 + 0.5 * dx.abs())).clamp(-0.92, 0.92).toDouble()
+        : 0.0;
+  }
+
+  double get _aimPreviewY {
+    if (matchPhase == 'ready') return -0.65;
+    final dy = _aimDirection.dy;
+    return dy.abs() < 0.35
+        ? -0.75
+        : (-0.75 + dy * 0.20).clamp(-0.92, -0.35).toDouble();
+  }
 
   StreamSubscription? _socketSub;
 
   @override
   void initState() {
     super.initState();
+    _renderTicker = createTicker(_renderFrame);
     _listenSocketEvents();
+  }
+
+  void _renderFrame(Duration _) {
+    final previous = _previousFrame;
+    final current = _latestFrame;
+    if (previous == null || current == null || !mounted) return;
+
+    final elapsedSinceSnapshot = _renderClock.elapsed - _latestFrameAt;
+    final progress =
+        (elapsedSinceSnapshot.inMicroseconds / _snapshotInterval.inMicroseconds)
+            .clamp(0.0, 1.0)
+            .toDouble();
+    final frame = _CourtFrame.interpolate(previous, current, progress);
+    setState(() {
+      ballX = frame.ballX;
+      ballY = frame.ballY;
+      ballHeight = frame.ballHeight;
+      ballVx = frame.ballVx;
+      ballVy = frame.ballVy;
+      ballVz = frame.ballVz;
+      ballRotation = frame.ballRotation;
+      myX = frame.myX;
+      myY = frame.myY;
+      opponentX = frame.opponentX;
+      opponentY = frame.opponentY;
+      playerActionProgress = frame.playerActionProgress;
+      opponentActionProgress = frame.opponentActionProgress;
+      _animClock = _renderClock.elapsed.inMicroseconds / 1000000;
+    });
   }
 
   void _listenSocketEvents() {
@@ -78,34 +198,41 @@ class _MultiplayerCourtScreenState extends State<MultiplayerCourtScreen> {
       final type = event['type'];
 
       if (type == 'STATE') {
+        final frame = _CourtFrame(
+          ballX: _number(event['ballX']),
+          ballY: _number(event['ballY']),
+          ballHeight: _number(event['ballHeight']),
+          ballVx: _number(event['ballVx']),
+          ballVy: _number(event['ballVy']),
+          ballVz: _number(event['ballVz']),
+          ballRotation: _number(event['ballRotation']),
+          myX: _number(event['myX']),
+          myY: _number(event['myY']),
+          opponentX: _number(event['opponentX']),
+          opponentY: _number(event['opponentY']),
+          playerActionProgress:
+              _number(event['playerActionProgress']).clamp(0, 1),
+          opponentActionProgress:
+              _number(event['opponentActionProgress']).clamp(0, 1),
+        );
         setState(() {
           myScore = _number(event['myScore']).round();
           opponentScore = _number(event['opponentScore']).round();
           isPlayerServing = event['isServing'] == true;
+          ballInReach = event['ballInReach'] == true;
           matchPhase = '${event['phase'] ?? 'rally'}';
           _hasAuthoritativeState = true;
           isGameOver = event['isGameOver'] == true;
           matchStatus = '${event['status'] ?? 'RALLY'}';
-          ballX = _number(event['ballX']);
-          ballY = _number(event['ballY']);
-          ballHeight = _number(event['ballHeight']);
-          ballVx = _number(event['ballVx']);
-          ballVy = _number(event['ballVy']);
-          ballVz = _number(event['ballVz']);
-          ballRotation = _number(event['ballRotation']);
-          myX = _number(event['myX']);
-          myY = _number(event['myY']);
-          opponentX = _number(event['opponentX']);
-          opponentY = _number(event['opponentY']);
           playerAnimState = '${event['playerAnimState'] ?? 'idle'}';
           opponentAnimState = '${event['opponentAnimState'] ?? 'idle'}';
-          playerActionProgress =
-              _number(event['playerActionProgress']).clamp(0, 1);
-          opponentActionProgress =
-              _number(event['opponentActionProgress']).clamp(0, 1);
           _paused = event['paused'] == true;
-          _animClock += 0.05;
+          _previousFrame = _latestFrame ?? frame;
+          _latestFrame = frame;
+          if (!_renderClock.isRunning) _renderClock.start();
+          _latestFrameAt = _renderClock.elapsed;
         });
+        if (!_renderTicker.isActive) _renderTicker.start();
         if (isGameOver && !_matchResultSubmitted) {
           _handleMatchEnd(myScore > opponentScore);
         }
@@ -154,16 +281,10 @@ class _MultiplayerCourtScreenState extends State<MultiplayerCourtScreen> {
 
   void _triggerShot(String type) {
     if (isGameOver || _paused) return;
-    final double targetY = _aimDirection.dy == 0
-        ? -0.65
-        : (_aimDirection.dy * 0.35 - 0.65).clamp(-0.92, -0.20).toDouble();
     SocketService.instance.sendEvent('SHOT', {
       'shotType': type,
-      'targetX': _aimDirection.dx.clamp(-0.92, 0.92),
-      'targetY': targetY,
-      'y': myY,
-      'aimX': _aimDirection.dx,
-      'aimY': targetY,
+      'aimX': _aimDirection.dx.clamp(-1.0, 1.0),
+      'aimY': _aimDirection.dy.clamp(-1.0, 1.0),
     });
   }
 
@@ -246,6 +367,8 @@ class _MultiplayerCourtScreenState extends State<MultiplayerCourtScreen> {
     _movementDirection = Offset.zero;
     _movementTimer?.cancel();
     _socketSub?.cancel();
+    _renderTicker.dispose();
+    _renderClock.stop();
     super.dispose();
   }
 
@@ -289,22 +412,16 @@ class _MultiplayerCourtScreenState extends State<MultiplayerCourtScreen> {
                   playerMoveX: _movementDirection.dx.clamp(-1, 1),
                   aiMoveAmount: opponentAnimState == 'walking' ? 0.7 : 0.0,
                   aiMoveX: 0,
-                  playerReach: 0.22,
-                  ballInReach: _hasAuthoritativeState &&
-                      ((matchPhase == 'ready' && isPlayerServing) ||
-                          (matchPhase == 'rally' && ballHeight < 0.8)),
-                  aimX: _aimDirection.dx.clamp(-0.92, 0.92),
-                  aimY: _aimDirection.dy == 0
-                      ? -0.65
-                      : (_aimDirection.dy * 0.35 - 0.65)
-                          .clamp(-0.92, -0.20)
-                          .toDouble(),
-                  aimScatter: 0.15,
+                  playerReach: _playerReach,
+                  ballInReach: ballInReach,
+                  aimX: _aimPreviewX,
+                  aimY: _aimPreviewY,
+                  aimScatter: 0.12 * (1.25 - _playerPaddle.control / 100.0),
                   showAim: _hasAuthoritativeState &&
                       !_paused &&
                       !isGameOver &&
                       ((matchPhase == 'ready' && isPlayerServing) ||
-                          (matchPhase == 'rally' && ballHeight < 0.8)),
+                          (matchPhase == 'rally' && ballInReach)),
                 ),
               ),
             ),

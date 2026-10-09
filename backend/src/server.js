@@ -385,6 +385,12 @@ const NET_CLEARANCE = 0.08;
         animationProgress: { host: 1, guest: 1 },
         animationDuration: { host: 0, guest: 0 },
         frames: { host: 0, guest: 0 },
+        paddles: {
+          [hostId]: { power: 40, control: 60, spin: 30 },
+          [guestId]: { power: 40, control: 60, spin: 30 },
+        },
+        pendingShots: new Map(),
+        nextShotAt: new Map(),
         input: new Map(),
         inputAt: new Map(),
       };
@@ -400,6 +406,8 @@ const NET_CLEARANCE = 0.08;
     }
 
     function awardPoint(state, winnerId) {
+      state.pendingShots.clear();
+      state.nextShotAt.clear();
       if (winnerId === state.hostId) state.score.host += 1;
       else state.score.guest += 1;
       state.servingPlayerId = winnerId;
@@ -439,6 +447,7 @@ const NET_CLEARANCE = 0.08;
       const px = isHost ? state.hostX : state.guestX;
       const py = isHost ? state.hostY : state.guestY;
       const serving = state.phase === 'ready' && state.servingPlayerId === playerId;
+      const paddle = state.paddles[playerId] || { power: 40, control: 60, spin: 30 };
       if (serving &&
           ((isHost && py < 1.02) || (!isHost && py > -1.02))) {
         awardPoint(state, isHost ? state.guestId : state.hostId);
@@ -447,45 +456,86 @@ const NET_CLEARANCE = 0.08;
       // A rally ball belongs to the opponent until it crosses back toward
       // this player. This prevents repeated button presses from relaunching
       // the same ball before it reaches the other side.
-      const incomingToHost = isHost && state.vy > 0;
-      const incomingToGuest = !isHost && state.vy < 0;
+      const localBallY = isHost ? state.ballY : -state.ballY;
+      const distanceToBall = Math.hypot(state.ballX - px, state.ballY - py);
+      const playerReach = 0.30 + (paddle.control / 100) * 0.10;
       const canHit = serving || (state.phase === 'rally' &&
         state.lastHitBy !== playerId &&
-        (incomingToHost || incomingToGuest) &&
-        ((isHost && state.ballY > -0.05) || (!isHost && state.ballY < 0.05)));
+        localBallY > -0.05 &&
+        distanceToBall <= playerReach &&
+        state.ballHeight <= 1.20);
       if (!canHit) return;
 
-      const type = String(shotType.type || 'DRIVE').toUpperCase();
-      const targetDepth = type === 'SMASH' ? 0.80 :
-        type === 'LOB' ? 0.85 :
-        type === 'ROLL' || type === 'SLICE' ? 0.28 :
-        serving ? 0.65 : 0.72;
+      const requestedType = String(shotType.type || 'DRIVE').toUpperCase();
+      const type = serving ? 'SERVE' :
+        ['DRIVE', 'SMASH', 'LOB', 'ROLL', 'SLICE'].includes(requestedType)
+          ? requestedType
+          : 'DRIVE';
+      const maxHeight = type === 'SMASH' ? 1.20 :
+        type === 'ROLL' || type === 'SLICE' ? 0.60 :
+        type === 'LOB' ? 0.70 : 0.85;
+      const minHeight = type === 'SMASH' ? 0.45 : 0.0;
+      if (!serving &&
+          (state.ballHeight > maxHeight || state.ballHeight < minHeight)) {
+        return;
+      }
+
+      const aimX = clamp(Number(shotType.aimX) || 0, -1, 1);
+      const aimY = clamp(Number(shotType.aimY) || 0, -1, 1);
+      const aimScatter = 0.12 * (1.25 - paddle.control / 100);
+      const aimingSideways = Math.abs(aimX) > 0.25;
+      let localTargetX;
+      if (serving) {
+        localTargetX = aimingSideways
+          ? clamp(aimX * 0.6 + (Math.random() - 0.5) * 0.1, -0.7, 0.7)
+          : (Math.random() - 0.5) * 0.5;
+      } else if (aimingSideways) {
+        localTargetX = clamp(
+          Math.sign(aimX) * (0.35 + 0.5 * Math.abs(aimX)) +
+            (Math.random() - 0.5) * 2 * aimScatter,
+          -0.92,
+          0.92
+        );
+      } else {
+        localTargetX = (Math.random() - 0.5) * 0.3;
+      }
+      const targetX = clamp(isHost ? localTargetX : -localTargetX, -0.92, 0.92);
+      let localTargetY;
+      if (serving) {
+        localTargetY = -0.65;
+      } else {
+        const baseY = type === 'SMASH' ? -0.80 :
+          type === 'LOB' ? -0.85 :
+          type === 'ROLL' || type === 'SLICE' ? -0.28 :
+          -0.75;
+        if (Math.abs(aimY) < 0.35) {
+          localTargetY = baseY;
+        } else if (type === 'ROLL' || type === 'SLICE') {
+          localTargetY = clamp(baseY + aimY * 0.06, -0.36, -0.20);
+        } else {
+          const range = type === 'LOB' ? 0.06 : 0.20;
+          localTargetY = clamp(baseY + aimY * range, -0.92, -0.35);
+        }
+      }
+      const targetY = isHost ? localTargetY : -localTargetY;
       const airTime = type === 'SMASH' ? 0.60 :
         type === 'LOB' ? 1.15 :
         type === 'ROLL' || type === 'SLICE' ? 0.85 :
-        serving ? 0.95 : 0.80;
+        type === 'SERVE' ? 0.95 : 0.80;
       const spin = type === 'SMASH' ? 0.7 :
         type === 'LOB' ? 0.3 :
         type === 'ROLL' || type === 'SLICE' ? -0.8 :
-        serving ? 0.0 : 0.35;
-      const requestedX = serving
-        ? (px >= 0 ? -0.48 : 0.48)
-        : Number.isFinite(Number(shotType.targetX))
-        ? Number(shotType.targetX)
-        : Number.isFinite(Number(shotType.x))
-          ? Number(shotType.x)
-        : (isHost ? px : -px);
-      const targetX = clamp(
-        serving ? requestedX : (isHost ? requestedX : -requestedX),
-        -0.92,
-        0.92
-      );
-      const requestedY = Number(shotType.targetY);
-      const targetY = serving
-        ? (isHost ? -0.65 : 0.65)
-        : Number.isFinite(requestedY)
-        ? clamp(isHost ? requestedY : -requestedY, -0.92, 0.92)
-        : (isHost ? -targetDepth : targetDepth);
+        type === 'SERVE' ? 0.0 : 0.35;
+      if (!serving && !isHost && -py < 0.32 &&
+          state.ballHeight > 0.20 && state.bounceCount === 0) {
+        awardPoint(state, state.hostId);
+        return;
+      }
+      if (!serving && isHost && py < 0.32 &&
+          state.ballHeight > 0.20 && state.bounceCount === 0) {
+        awardPoint(state, state.guestId);
+        return;
+      }
       state.ballX = px;
       state.ballY = py;
       state.ballHeight = 0.45;
@@ -496,14 +546,17 @@ const NET_CLEARANCE = 0.08;
       let vy = 0;
       let vz = 0;
       let effectiveGravity = GRAVITY;
-      let flightTime = airTime;
+      let flightTime = type === 'SERVE'
+        ? airTime
+        : airTime / (1 + (paddle.power - 45) / 250);
+      const adjustedSpin = spin * (paddle.spin / 60);
       for (let i = 0; i < 12; i += 1) {
         const decay = 1 - Math.exp(-AIR_DRAG * flightTime);
         vx = dx * AIR_DRAG / decay;
         vy = dy * AIR_DRAG / decay;
         const speed = Math.sqrt(vx * vx + vy * vy);
         effectiveGravity = Math.max(
-          GRAVITY + spin * SPIN_MAGNUS * speed,
+          GRAVITY + adjustedSpin * SPIN_MAGNUS * speed,
           3.0
         );
         vz = (effectiveGravity * flightTime / AIR_DRAG - state.ballHeight) *
@@ -522,22 +575,13 @@ const NET_CLEARANCE = 0.08;
       state.vx = vx;
       state.vy = vy;
       state.vz = vz;
-      state.spin = spin;
+      state.spin = adjustedSpin;
       state.effectiveGravity = effectiveGravity;
       state.bounceCount = 0;
       state.serveInFlight = serving;
       state.lastHitBy = playerId;
       state.phase = 'rally';
       state.status = `${isHost ? 'HOST' : 'GUEST'} ${type}`;
-      state.animation[isHost ? 'host' : 'guest'] =
-        serving ? 'serving' :
-        type === 'SMASH' ? 'smash' :
-        type === 'LOB' ? 'lob' :
-        type === 'ROLL' || type === 'SLICE' ? 'slice' : 'drive';
-      state.frames[isHost ? 'host' : 'guest'] = 0;
-      state.animationProgress[isHost ? 'host' : 'guest'] = 0;
-      state.animationDuration[isHost ? 'host' : 'guest'] =
-        serving ? 0.65 : type === 'SMASH' ? 0.55 : 0.45;
     }
 
     function updateMatchState(state, dt) {
@@ -549,6 +593,13 @@ const NET_CLEARANCE = 0.08;
             state.animationProgress[side] +
               dt / Math.max(0.01, state.animationDuration[side])
           );
+        }
+      }
+      const now = Date.now();
+      for (const [playerId, pending] of state.pendingShots) {
+        if (now >= pending.contactAt) {
+          state.pendingShots.delete(playerId);
+          startServerShot(state, playerId, pending.shot);
         }
       }
       const activeInput = (playerId) => {
@@ -606,6 +657,24 @@ const NET_CLEARANCE = 0.08;
           state.ballY = state.guestY + 0.02;
           state.ballHeight = 0.3;
         }
+        const pendingServe = state.pendingShots.get(state.servingPlayerId);
+        if (pendingServe?.serving) {
+          const elapsed = (now - pendingServe.startedAt) / 1000;
+          const tossProgress = elapsed / pendingServe.animationDuration;
+          if (tossProgress < 0.35) {
+            const playerX = state.servingPlayerId === state.hostId
+              ? state.hostX
+              : state.guestX;
+            const playerY = state.servingPlayerId === state.hostId
+              ? state.hostY
+              : state.guestY;
+            state.ballX = playerX - 0.08;
+            state.ballY = playerY +
+              (state.servingPlayerId === state.hostId ? -0.02 : 0.02);
+            state.ballHeight = 0.4 +
+              Math.sin(Math.PI * tossProgress / 0.35) * 0.45;
+          }
+        }
         return;
       }
 
@@ -644,6 +713,12 @@ const NET_CLEARANCE = 0.08;
             : state.hostId);
           return;
         }
+        if (state.bounceCount > 1) {
+          awardPoint(state, state.lastHitBy === state.hostId
+            ? state.guestId
+            : state.hostId);
+          return;
+        }
         const verticalKeep = clamp(
           BOUNCE_RESTITUTION * (1 - 0.18 * state.spin),
           0.35,
@@ -666,6 +741,17 @@ const NET_CLEARANCE = 0.08;
     function snapshotFor(state, playerId) {
       const hostView = playerId === state.hostId;
       const flip = (value) => hostView ? value : -value;
+      const playerX = hostView ? state.hostX : -state.guestX;
+      const playerY = hostView ? state.hostY : -state.guestY;
+      const localBallX = flip(state.ballX);
+      const localBallY = flip(state.ballY);
+      const paddle = state.paddles[playerId] || { control: 60 };
+      const ballInReach = state.phase === 'rally' &&
+        state.lastHitBy !== playerId &&
+        localBallY > -0.05 &&
+        Math.hypot(localBallX - playerX, localBallY - playerY) <=
+          0.30 + (paddle.control / 100) * 0.10 &&
+        state.ballHeight <= 1.20;
       let status = state.status;
       if (state.paused) {
         status = 'MATCH PAUSED';
@@ -687,6 +773,7 @@ const NET_CLEARANCE = 0.08;
         myScore: hostView ? state.score.host : state.score.guest,
         opponentScore: hostView ? state.score.guest : state.score.host,
         isServing: state.servingPlayerId === playerId,
+        ballInReach,
         ballX: flip(state.ballX),
         ballY: flip(state.ballY),
         ballHeight: state.ballHeight,
@@ -694,8 +781,8 @@ const NET_CLEARANCE = 0.08;
         ballVy: state.vy,
         ballVz: state.vz,
         ballRotation: state.spin,
-        myX: hostView ? state.hostX : -state.guestX,
-        myY: hostView ? state.hostY : -state.guestY,
+        myX: playerX,
+        myY: playerY,
         opponentX: hostView ? state.guestX : -state.hostX,
         opponentY: hostView ? state.guestY : -state.hostY,
         playerAnimState: hostView ? state.animation.host : state.animation.guest,
@@ -829,12 +916,45 @@ webSocketServer.on('connection', async (socket, request) => {
         state.paused = false;
         state.status = state.phase === 'ready' ? 'YOUR SERVE' : 'RALLY IN PROGRESS';
       } else if (message.type === 'SHOT') {
-        startServerShot(state, socket.playerId, {
-          type: String(message.shotType || 'DRIVE'),
-          x: message.x,
-          targetX: message.targetX,
-          targetY: message.targetY,
-        });
+            if (state.paused || state.phase === 'match_over' ||
+                state.pendingShots.has(socket.playerId) ||
+                Date.now() < (state.nextShotAt.get(socket.playerId) || 0)) {
+              return;
+            }
+            const serving = state.phase === 'ready' &&
+              state.servingPlayerId === socket.playerId;
+            const shotType = String(message.shotType || 'DRIVE').toUpperCase();
+            const animState = serving ? 'serving' :
+              shotType === 'SMASH' ? 'smash' :
+              shotType === 'LOB' ? 'lob' :
+              shotType === 'ROLL' || shotType === 'SLICE' ? 'slice' : 'drive';
+            const animationDuration = serving ? 0.60 :
+              shotType === 'SMASH' || shotType === 'LOB' ? 0.55 :
+              shotType === 'ROLL' || shotType === 'SLICE' ? 0.48 : 0.42;
+            const contactDelay = animationDuration *
+              (serving ? 0.35 :
+                shotType === 'SMASH' ? 0.28 :
+                shotType === 'ROLL' || shotType === 'SLICE' ? 0.25 : 0.22);
+            const side = socket.playerId === state.hostId ? 'host' : 'guest';
+            state.animation[side] = animState;
+            state.animationDuration[side] = animationDuration;
+            state.animationProgress[side] = 0;
+            state.frames[side] = 0;
+            state.pendingShots.set(socket.playerId, {
+              shot: {
+                type: shotType,
+                aimX: message.aimX,
+                aimY: message.aimY,
+              },
+              serving,
+              startedAt: Date.now(),
+              contactAt: Date.now() + contactDelay * 1000,
+              animationDuration,
+            });
+            state.nextShotAt.set(
+              socket.playerId,
+              Date.now() + animationDuration * 0.6 * 1000
+            );
       }
     } catch (error) {
       console.error('Invalid WebSocket message:', error);
@@ -850,6 +970,14 @@ webSocketServer.on('connection', async (socket, request) => {
   socket.send(JSON.stringify({ type: 'CONNECTED', username: socket.username }));
   const state = getMatchState(room);
   if (state) {
+    const paddle = await Paddle.findOne({ id: player.equippedPaddleId }).lean();
+    if (paddle) {
+      state.paddles[socket.playerId] = {
+        power: paddle.power,
+        control: paddle.control,
+        spin: paddle.spin,
+      };
+    }
     socket.send(JSON.stringify(snapshotFor(state, socket.playerId)));
   }
   const connectedPlayers = room.players

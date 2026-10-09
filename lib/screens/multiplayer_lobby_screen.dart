@@ -116,10 +116,12 @@ class _MultiplayerLobbyScreenState extends State<MultiplayerLobbyScreen> {
     }
   }
 
-  void _openCourt() {
+  Future<void> _openCourt() async {
     if (_openingCourt || !mounted) return;
     _openingCourt = true;
     _roomPollTimer?.cancel();
+    final paddle = await StorageService.getEquippedPaddle();
+    if (!mounted) return;
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(
@@ -129,6 +131,7 @@ class _MultiplayerLobbyScreenState extends State<MultiplayerLobbyScreen> {
           roomCode: widget.roomCode,
           isHost: widget.isHost,
           opponentName: opponentName ?? 'Opponent',
+          paddle: paddle,
         ),
       ),
     );
