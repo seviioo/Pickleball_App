@@ -110,12 +110,16 @@ class PerspectiveCourtPainter extends CustomPainter {
 
     // Calculate court scaling & proportions dynamically for orientation
     final double maxCourtWidth =
-        isLandscape ? size.width * 0.78 : size.width * 0.85;
+        isLandscape ? size.width * 0.72 : size.width * 0.85;
     final double maxCourtHeight =
-        isLandscape ? size.height * 0.78 : size.height * 0.80;
-    final double courtHeight = min(maxCourtHeight, maxCourtWidth * 1.35);
-    final double topWidth = courtHeight * 0.42;
-    final double bottomWidth = courtHeight * 0.82;
+        isLandscape ? size.height * 0.76 : size.height * 0.80;
+    final double courtHeight = min(
+      maxCourtHeight,
+      isLandscape ? maxCourtWidth * 0.92 : maxCourtWidth * 1.35,
+    );
+    final double topWidth =
+        isLandscape ? maxCourtWidth * 0.58 : courtHeight * 0.42;
+    final double bottomWidth = isLandscape ? maxCourtWidth : courtHeight * 0.82;
     final double centerY =
         isLandscape ? size.height * 0.56 : size.height * 0.50;
     final double topY = centerY - (courtHeight * 0.45);
