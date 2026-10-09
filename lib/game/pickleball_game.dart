@@ -242,6 +242,9 @@ class PickleballGame extends FlameGame {
     _pendingShot = null;
     _contactDelayTimer = 0.0;
     _isTossing = false;
+    _playerSwingCooldown = 0.0;
+    playerAnimTimer = 0.0;
+    aiAnimTimer = 0.0;
 
     if (isPlayerServing) {
       playerX = 0.0;
