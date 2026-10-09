@@ -156,13 +156,13 @@ class PickleballGame extends FlameGame {
   double _orbSpawnTimer = 0.0;
   bool isDoublePointsActive = false;
   double _aiShrinkTimer = 0.0;
-  
+
   Offset playerInputDir = Offset.zero;
-  Offset aimInput = Offset.zero; 
+  Offset aimInput = Offset.zero;
   String? _pendingShot;
   double _contactDelayTimer = 0.0;
   bool _isTossing = false;
-  
+
   double _aiServeTimer = 0.0;
   int _bounceCount = 0;
 
@@ -270,12 +270,12 @@ class PickleballGame extends FlameGame {
     if (!_isTossing) {
       if (isPlayerServing) {
         // Player is facing UP the court. Left (off-hand) is -X.
-        ballX = playerX - 0.08; 
+        ballX = playerX - 0.08;
         ballY = playerY - 0.02;
         ballHeight = 0.40;
       } else {
         // Opponent is facing DOWN the court. Their left (off-hand) is +X from our perspective.
-        ballX = opponentX + 0.08; 
+        ballX = opponentX + 0.08;
         ballY = opponentY + 0.02;
         ballHeight = 0.30;
       }
@@ -290,9 +290,10 @@ class PickleballGame extends FlameGame {
     }
     playerInputDir = dir;
   }
-  
+
   void updateAim(Offset dir) {
-    if (gameState == GameMatchState.paused || gameState == GameMatchState.matchOver) {
+    if (gameState == GameMatchState.paused ||
+        gameState == GameMatchState.matchOver) {
       aimInput = Offset.zero;
       return;
     }
@@ -304,20 +305,9 @@ class PickleballGame extends FlameGame {
   double get _aimSideTarget =>
       aimInput.dx.sign * (0.35 + 0.5 * aimInput.dx.abs());
 
-  double _playerAimX() {
-    if (_isAimingSideways) {
-      return (_aimSideTarget + (_rng.nextDouble() - 0.5) * 2.0 * _aimScatter)
-          .clamp(-0.92, 0.92)
-          .toDouble();
-    }
-    return (_rng.nextDouble() - 0.5) * 0.3;
-  }
-
   double _playerServeAimX() {
-    if (!_isAimingSideways) return (_rng.nextDouble() - 0.5) * 0.5;
-    return (aimInput.dx * 0.6 + (_rng.nextDouble() - 0.5) * 0.1)
-        .clamp(-0.7, 0.7)
-        .toDouble();
+    if (!_isAimingSideways) return 0.0;
+    return (aimInput.dx * 0.6).clamp(-0.7, 0.7).toDouble();
   }
 
   double _playerAimDepth(String shotType, double baseY) {
@@ -391,7 +381,7 @@ class PickleballGame extends FlameGame {
         _startPlayerAnim(swingAnim);
         _pendingShot = shotType;
         _playerSwingCooldown = playerAnimDuration * 0.6;
-        
+
         if (shotType == 'SMASH' || shotType == 'ULTIMATE') {
           _contactDelayTimer = playerAnimDuration * 0.28;
         } else if (shotType == 'ROLL' || shotType == 'SLICE') {
@@ -522,7 +512,8 @@ class PickleballGame extends FlameGame {
       ultimateGauge = (ultimateGauge + 0.20).clamp(0.0, 1.0);
     }
 
-    double targetX = _playerAimX();
+    final double previewTargetX = playerAimPreview.dx;
+    double targetX = previewTargetX;
     double targetY = -0.72;
     double airTime = 0.80;
     double spin = 0.35;
@@ -574,7 +565,7 @@ class PickleballGame extends FlameGame {
 
     airTime /= (1.0 + (paddle.power - 45) / 250.0);
     spin *= (paddle.spin / 60.0);
-    targetY = _playerAimDepth(shotType, targetY);
+    targetY = playerAimPreview.dy;
 
     _onPlayerShot();
 
@@ -657,11 +648,11 @@ class PickleballGame extends FlameGame {
           _executeAiServe();
         }
       }
-      
+
       // Allow player movement setup and swing initiation while ready
       _processPlayerMovement(dt);
       _processFrameSync(dt);
-      
+
       _notifyState();
       return;
     }
@@ -707,7 +698,7 @@ class PickleballGame extends FlameGame {
     if (ballImpactTimer > 0) ballImpactTimer -= dt;
     _notifyState();
   }
-  
+
   void _processPlayerMovement(double dt) {
     double moveSpeed = 1.4 * characterStyle.speedMultiplier;
     if (playerInputDir != Offset.zero) {
@@ -747,11 +738,11 @@ class PickleballGame extends FlameGame {
     if (playerAnimTimer > 0) playerAnimTimer -= dt;
     if (aiAnimTimer > 0) aiAnimTimer -= dt;
   }
-  
+
   void _processFrameSync(double dt) {
     if (_contactDelayTimer > 0) {
       _contactDelayTimer -= dt;
-      
+
       if (_isTossing && playerAnimDuration > 0) {
         double p = 1.0 - (playerAnimTimer / playerAnimDuration);
         if (p < 0.35) {
@@ -761,9 +752,10 @@ class PickleballGame extends FlameGame {
       }
 
       if (_contactDelayTimer <= 0) {
-        if (_pendingShot == 'SERVE') _executePlayerServe();
+        if (_pendingShot == 'SERVE')
+          _executePlayerServe();
         else if (_pendingShot != null) _executePlayerHit(_pendingShot!);
-        
+
         _pendingShot = null;
         _isTossing = false;
       }
