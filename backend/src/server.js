@@ -376,11 +376,14 @@ const NET_CLEARANCE = 0.08;
         lastHitBy: hostId,
         servingPlayerId: hostId,
         phase: 'ready',
+        paused: false,
         score: { host: 0, guest: 0 },
         status: 'YOUR SERVE',
         sequence: 0,
         lastTick: Date.now(),
         animation: { host: 'idle', guest: 'idle' },
+        animationProgress: { host: 1, guest: 1 },
+        animationDuration: { host: 0, guest: 0 },
         frames: { host: 0, guest: 0 },
         input: new Map(),
         inputAt: new Map(),
@@ -418,6 +421,8 @@ const NET_CLEARANCE = 0.08;
       state.status = winnerId === state.hostId ? 'YOUR SERVE' : 'OPPONENT SERVE';
       state.animation.host = 'idle';
       state.animation.guest = 'idle';
+      state.animationProgress.host = 1;
+      state.animationProgress.guest = 1;
       state.frames.host = 0;
       state.frames.guest = 0;
       if ((state.score.host >= 11 || state.score.guest >= 11) &&
@@ -510,10 +515,22 @@ const NET_CLEARANCE = 0.08;
         type === 'LOB' ? 'lob' :
         type === 'ROLL' || type === 'SLICE' ? 'slice' : 'drive';
       state.frames[isHost ? 'host' : 'guest'] = 0;
+      state.animationProgress[isHost ? 'host' : 'guest'] = 0;
+      state.animationDuration[isHost ? 'host' : 'guest'] =
+        serving ? 0.65 : type === 'SMASH' ? 0.55 : 0.45;
     }
 
     function updateMatchState(state, dt) {
-      if (state.phase === 'match_over') return;
+      if (state.phase === 'match_over' || state.paused) return;
+      for (const side of ['host', 'guest']) {
+        if (state.animationProgress[side] < 1) {
+          state.animationProgress[side] = Math.min(
+            1,
+            state.animationProgress[side] +
+              dt / Math.max(0.01, state.animationDuration[side])
+          );
+        }
+      }
       const activeInput = (playerId) => {
         const lastInput = state.inputAt.get(playerId) || 0;
         return Date.now() - lastInput < 180
@@ -553,7 +570,10 @@ const NET_CLEARANCE = 0.08;
       );
       for (const [key, input] of [[state.hostId, hostInput], [state.guestId, guestInput]]) {
         const moving = Math.abs(input.dx) > 0.1 || Math.abs(input.dy) > 0.1;
-        state.animation[key === state.hostId ? 'host' : 'guest'] = moving ? 'walking' : 'idle';
+        const side = key === state.hostId ? 'host' : 'guest';
+        if (state.animationProgress[side] >= 1) {
+          state.animation[side] = moving ? 'walking' : 'idle';
+        }
       }
 
       if (state.phase === 'ready') {
@@ -632,7 +652,9 @@ const NET_CLEARANCE = 0.08;
       const hostView = playerId === state.hostId;
       const flip = (value) => hostView ? value : -value;
       let status = state.status;
-      if (state.phase === 'ready') {
+      if (state.paused) {
+        status = 'MATCH PAUSED';
+      } else if (state.phase === 'ready') {
         status = state.servingPlayerId === playerId
           ? 'YOUR SERVE'
           : 'OPPONENT SERVE';
@@ -645,6 +667,7 @@ const NET_CLEARANCE = 0.08;
         sequence: state.sequence,
         phase: state.phase,
         status,
+        paused: state.paused,
         isGameOver: state.score.host >= 11 || state.score.guest >= 11,
         myScore: hostView ? state.score.host : state.score.guest,
         opponentScore: hostView ? state.score.guest : state.score.host,
@@ -652,12 +675,22 @@ const NET_CLEARANCE = 0.08;
         ballX: flip(state.ballX),
         ballY: flip(state.ballY),
         ballHeight: state.ballHeight,
+        ballVx: state.vx,
+        ballVy: state.vy,
+        ballVz: state.vz,
+        ballRotation: state.spin,
         myX: hostView ? state.hostX : -state.guestX,
         myY: hostView ? state.hostY : -state.guestY,
         opponentX: hostView ? state.guestX : -state.hostX,
         opponentY: hostView ? state.guestY : -state.hostY,
         playerAnimState: hostView ? state.animation.host : state.animation.guest,
         opponentAnimState: hostView ? state.animation.guest : state.animation.host,
+        playerActionProgress: hostView
+          ? state.animationProgress.host
+          : state.animationProgress.guest,
+        opponentActionProgress: hostView
+          ? state.animationProgress.guest
+          : state.animationProgress.host,
       };
     }
 
@@ -774,6 +807,12 @@ webSocketServer.on('connection', async (socket, request) => {
         const dy = clamp(Number(message.dy) || 0, -1, 1);
         state.input.set(socket.playerId, { dx, dy });
         state.inputAt.set(socket.playerId, Date.now());
+      } else if (message.type === 'PAUSE') {
+        state.paused = true;
+        state.status = 'MATCH PAUSED';
+      } else if (message.type === 'RESUME') {
+        state.paused = false;
+        state.status = state.phase === 'ready' ? 'YOUR SERVE' : 'RALLY IN PROGRESS';
       } else if (message.type === 'SHOT') {
         startServerShot(state, socket.playerId, {
           type: String(message.shotType || 'DRIVE'),

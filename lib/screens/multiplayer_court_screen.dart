@@ -39,6 +39,10 @@ class _MultiplayerCourtScreenState extends State<MultiplayerCourtScreen> {
   double ballX = 0.0;
   double ballY = 0.0;
   double ballHeight = 0.4;
+  double ballVx = 0;
+  double ballVy = 0;
+  double ballVz = 0;
+  double ballRotation = 0;
 
   int myScore = 0;
   int opponentScore = 0;
@@ -47,6 +51,12 @@ class _MultiplayerCourtScreenState extends State<MultiplayerCourtScreen> {
   bool isPlayerServing = true;
   String playerAnimState = 'idle';
   String opponentAnimState = 'idle';
+  double playerActionProgress = 1;
+  double opponentActionProgress = 1;
+  Offset _aimDirection = Offset.zero;
+  bool _paused = false;
+  double _animClock = 0;
+  final PaddleData _playerPaddle = PaddleData.starter();
   bool _matchResultSubmitted = false;
   Offset _movementDirection = Offset.zero;
   Timer? _movementTimer;
@@ -74,12 +84,22 @@ class _MultiplayerCourtScreenState extends State<MultiplayerCourtScreen> {
           ballX = _number(event['ballX']);
           ballY = _number(event['ballY']);
           ballHeight = _number(event['ballHeight']);
+          ballVx = _number(event['ballVx']);
+          ballVy = _number(event['ballVy']);
+          ballVz = _number(event['ballVz']);
+          ballRotation = _number(event['ballRotation']);
           myX = _number(event['myX']);
           myY = _number(event['myY']);
           opponentX = _number(event['opponentX']);
           opponentY = _number(event['opponentY']);
           playerAnimState = '${event['playerAnimState'] ?? 'idle'}';
           opponentAnimState = '${event['opponentAnimState'] ?? 'idle'}';
+          playerActionProgress =
+              _number(event['playerActionProgress']).clamp(0, 1);
+          opponentActionProgress =
+              _number(event['opponentActionProgress']).clamp(0, 1);
+          _paused = event['paused'] == true;
+          _animClock += 0.05;
         });
         if (isGameOver && !_matchResultSubmitted) {
           _handleMatchEnd(myScore > opponentScore);
@@ -128,12 +148,26 @@ class _MultiplayerCourtScreenState extends State<MultiplayerCourtScreen> {
   }
 
   void _triggerShot(String type) {
-    if (isGameOver) return;
+    if (isGameOver || _paused) return;
     SocketService.instance.sendEvent('SHOT', {
       'shotType': type,
-      'x': myX,
+      'x': _aimDirection.dx == 0 ? myX : _aimDirection.dx,
       'y': myY,
+      'aimX': _aimDirection.dx,
+      'aimY': _aimDirection.dy,
     });
+  }
+
+  void _updateAim(Offset direction) {
+    _aimDirection = direction;
+  }
+
+  void _togglePause() {
+    if (_paused) {
+      SocketService.instance.sendEvent('RESUME', {});
+    } else {
+      SocketService.instance.sendEvent('PAUSE', {});
+    }
   }
 
   void _handleMatchEnd(bool isWinner) async {
@@ -215,16 +249,42 @@ class _MultiplayerCourtScreenState extends State<MultiplayerCourtScreen> {
                   aiAnimState: _animationFor(opponentAnimState),
                   playerFrame: 0,
                   aiFrame: 0,
+                  playerPaddle: _playerPaddle,
+                  ballVx: ballVx,
+                  ballVy: ballVy,
+                  ballVz: ballVz,
+                  ballRotation: ballRotation,
+                  animClock: _animClock,
+                  playerActionProgress: playerActionProgress,
+                  aiActionProgress: opponentActionProgress,
+                  playerMoveAmount: _movementDirection.distance.clamp(0, 1),
+                  playerMoveX: _movementDirection.dx.clamp(-1, 1),
+                  aiMoveAmount: opponentAnimState == 'walking' ? 0.7 : 0.0,
+                  aiMoveX: 0,
+                  playerReach: 0.22,
+                  ballInReach: isPlayerServing || ballHeight < 0.8,
+                  aimX: _aimDirection.dx.clamp(-0.92, 0.92),
+                  aimY: _aimDirection.dy == 0 ? -0.65 : _aimDirection.dy,
+                  aimScatter: 0.15,
+                  showAim: !_paused &&
+                      !isGameOver &&
+                      (isPlayerServing || ballHeight < 0.8),
                 ),
               ),
             ),
 
-            // Navigation stays on the side, separate from the score header.
+            // The AI screen uses pause and home in the side header.
             Positioned(
               top: isLandscape ? 8 : 12,
               left: isLandscape ? 12 : 8,
               child: Row(
                 children: [
+                  _buildNavigationButton(
+                    icon: _paused ? Icons.play_arrow_rounded : Icons.pause,
+                    onPressed: _togglePause,
+                    tooltip: _paused ? 'Resume' : 'Pause',
+                  ),
+                  const SizedBox(width: 6),
                   _buildNavigationButton(
                     icon: Icons.arrow_back_rounded,
                     onPressed: _goBack,
@@ -306,8 +366,41 @@ class _MultiplayerCourtScreenState extends State<MultiplayerCourtScreen> {
               ),
             ),
 
-            // Touch Controls
-            if (!isGameOver) ...[
+            if (_paused)
+              Positioned.fill(
+                child: Center(
+                  child: Container(
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF18181B).withOpacity(0.96),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: const Color(0xFFFACC15)),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text('MATCH PAUSED',
+                            style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 20,
+                                fontWeight: FontWeight.w900)),
+                        const SizedBox(height: 16),
+                        ElevatedButton(
+                          onPressed: _togglePause,
+                          child: const Text('RESUME'),
+                        ),
+                        TextButton(
+                          onPressed: _goHome,
+                          child: const Text('LEAVE MATCH'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+
+            // Touch Controls match Player-vs-AI: joystick plus drag-to-aim shots.
+            if (!isGameOver && !_paused) ...[
               Positioned(
                 left: isLandscape ? 36 : 24,
                 bottom: isLandscape ? 16 : 24,
@@ -322,17 +415,28 @@ class _MultiplayerCourtScreenState extends State<MultiplayerCourtScreen> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
+                    if (isPlayerServing)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: _buildAimableButton(
+                          label: 'SERVE',
+                          shotType: 'SERVE',
+                          isPrimary: true,
+                          width: 130,
+                          height: 48,
+                        ),
+                      ),
                     Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        _buildStreetButton(
+                        _buildAimableButton(
                           label: 'SLICE',
-                          onPressed: () => _triggerShot('ROLL'),
+                          shotType: 'ROLL',
                         ),
                         const SizedBox(width: 12),
-                        _buildStreetButton(
+                        _buildAimableButton(
                           label: 'DRIVE',
-                          onPressed: () => _triggerShot('DRIVE'),
+                          shotType: 'DRIVE',
                           isPrimary: true,
                         ),
                       ],
@@ -341,14 +445,14 @@ class _MultiplayerCourtScreenState extends State<MultiplayerCourtScreen> {
                     Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        _buildStreetButton(
+                        _buildAimableButton(
                           label: 'LOB',
-                          onPressed: () => _triggerShot('LOB'),
+                          shotType: 'LOB',
                         ),
                         const SizedBox(width: 12),
-                        _buildStreetButton(
+                        _buildAimableButton(
                           label: 'SMASH',
-                          onPressed: () => _triggerShot('SMASH'),
+                          shotType: 'SMASH',
                         ),
                       ],
                     ),
@@ -362,35 +466,20 @@ class _MultiplayerCourtScreenState extends State<MultiplayerCourtScreen> {
     );
   }
 
-  Widget _buildStreetButton({
+  Widget _buildAimableButton({
     required String label,
-    required VoidCallback onPressed,
+    required String shotType,
     bool isPrimary = false,
+    double? width,
+    double? height,
   }) {
-    return GestureDetector(
-      onTap: onPressed,
-      child: Container(
-        width: isPrimary ? 72 : 64,
-        height: isPrimary ? 72 : 64,
-        decoration: BoxDecoration(
-          color: isPrimary ? const Color(0xFFDC2626) : const Color(0xFF27272A),
-          shape: BoxShape.circle,
-          border: Border.all(
-            color: isPrimary ? const Color(0xFFFACC15) : Colors.white38,
-            width: 2.5,
-          ),
-        ),
-        child: Center(
-          child: Text(
-            label,
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.w900,
-              fontSize: 11,
-            ),
-          ),
-        ),
-      ),
+    return AimableShotButton(
+      label: label,
+      isPrimary: isPrimary,
+      width: width,
+      height: height,
+      onAim: _updateAim,
+      onShoot: () => _triggerShot(shotType),
     );
   }
 
