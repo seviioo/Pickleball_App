@@ -444,7 +444,14 @@ const NET_CLEARANCE = 0.08;
         awardPoint(state, isHost ? state.guestId : state.hostId);
         return;
       }
+      // A rally ball belongs to the opponent until it crosses back toward
+      // this player. This prevents repeated button presses from relaunching
+      // the same ball before it reaches the other side.
+      const incomingToHost = isHost && state.vy > 0;
+      const incomingToGuest = !isHost && state.vy < 0;
       const canHit = serving || (state.phase === 'rally' &&
+        state.lastHitBy !== playerId &&
+        (incomingToHost || incomingToGuest) &&
         ((isHost && state.ballY > -0.05) || (!isHost && state.ballY < 0.05)));
       if (!canHit) return;
 
