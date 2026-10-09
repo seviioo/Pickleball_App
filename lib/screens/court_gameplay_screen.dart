@@ -229,88 +229,94 @@ class _CourtGameplayScreenState extends State<CourtGameplayScreen> {
           backgroundColor: const Color(0xFF18181B),
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          child: Padding(
-            padding: const EdgeInsets.all(24.0),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.pause_circle_filled,
-                    color: Color(0xFFFACC15), size: 56),
-                const SizedBox(height: 12),
-                const Text('MATCH PAUSED',
-                    style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 22,
-                        fontWeight: FontWeight.w900)),
-                const SizedBox(height: 24),
-                SizedBox(
-                  width: double.infinity,
-                  height: 48,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFFACC15),
-                      foregroundColor: Colors.black,
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.sizeOf(context).height * 0.9,
+              maxWidth: 420,
+            ),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.pause_circle_filled,
+                      color: Color(0xFFFACC15), size: 56),
+                  const SizedBox(height: 12),
+                  const Text('MATCH PAUSED',
+                      style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 22,
+                          fontWeight: FontWeight.w900)),
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFFACC15),
+                        foregroundColor: Colors.black,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                      ),
+                      onPressed: () {
+                        game.resumeGame();
+                        Navigator.pop(context);
+                      },
+                      child: const Text('RESUME MATCH',
+                          style: TextStyle(fontWeight: FontWeight.w900)),
                     ),
-                    onPressed: () {
-                      game.resumeGame();
-                      Navigator.pop(context);
-                    },
-                    child: const Text('RESUME MATCH',
-                        style: TextStyle(fontWeight: FontWeight.w900)),
                   ),
-                ),
-                const SizedBox(height: 12),
-                SizedBox(
-                  width: double.infinity,
-                  height: 48,
-                  child: OutlinedButton(
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.white,
-                      side: const BorderSide(color: Colors.white24),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.white,
+                        side: const BorderSide(color: Colors.white24),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                      ),
+                      onPressed: () {
+                        Navigator.pop(context);
+                        setState(() {
+                          _hasShownGameOverModal = false;
+                          game.resetPositions(isPlayerServing: true);
+                          game.playerScore = 0;
+                          game.opponentScore = 0;
+                          game.isGameOver = false;
+                        });
+                      },
+                      child: const Text('RESTART MATCH',
+                          style: TextStyle(fontWeight: FontWeight.bold)),
                     ),
-                    onPressed: () {
-                      Navigator.pop(context);
-                      setState(() {
-                        _hasShownGameOverModal = false;
-                        game.resetPositions(isPlayerServing: true);
-                        game.playerScore = 0;
-                        game.opponentScore = 0;
-                        game.isGameOver = false;
-                      });
-                    },
-                    child: const Text('RESTART MATCH',
-                        style: TextStyle(fontWeight: FontWeight.bold)),
                   ),
-                ),
-                const SizedBox(height: 12),
-                SizedBox(
-                  width: double.infinity,
-                  height: 48,
-                  child: TextButton.icon(
-                    style: TextButton.styleFrom(
-                        foregroundColor: const Color(0xFFEF4444)),
-                    onPressed: () {
-                      Navigator.pushAndRemoveUntil(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => LobbyScreen(
-                            userName: widget.userName,
-                            characterStyle: widget.characterStyle,
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: TextButton.icon(
+                      style: TextButton.styleFrom(
+                          foregroundColor: const Color(0xFFEF4444)),
+                      onPressed: () {
+                        Navigator.pushAndRemoveUntil(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => LobbyScreen(
+                              userName: widget.userName,
+                              characterStyle: widget.characterStyle,
+                            ),
                           ),
-                        ),
-                        (route) => false,
-                      );
-                    },
-                    icon: const Icon(Icons.home, size: 20),
-                    label: const Text('QUIT TO LOBBY',
-                        style: TextStyle(fontWeight: FontWeight.bold)),
+                          (route) => false,
+                        );
+                      },
+                      icon: const Icon(Icons.home, size: 20),
+                      label: const Text('QUIT TO LOBBY',
+                          style: TextStyle(fontWeight: FontWeight.bold)),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         );
