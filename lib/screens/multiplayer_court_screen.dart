@@ -7,6 +7,7 @@ import '../services/api_service.dart';
 import '../services/socket_service.dart';
 import 'court_gameplay_screen.dart';
 import 'lobby_screen.dart';
+import 'match_summary_screen.dart';
 
 class MultiplayerCourtScreen extends StatefulWidget {
   final String userName;
@@ -183,15 +184,34 @@ class _MultiplayerCourtScreenState extends State<MultiplayerCourtScreen> {
     });
 
     final String idempotencyKey = '${widget.roomCode}_${widget.userName}_end';
-    await ApiService.submitMatchResult(
-      username: widget.userName,
-      matchId: widget.roomCode,
-      roomCode: widget.roomCode,
-      playerScore: myScore,
-      opponentScore: opponentScore,
-      isWinner: isWinner,
-      idempotencyKey: idempotencyKey,
+    try {
+      await ApiService.submitMatchResult(
+        username: widget.userName,
+        matchId: widget.roomCode,
+        roomCode: widget.roomCode,
+        playerScore: myScore,
+        opponentScore: opponentScore,
+        isWinner: isWinner,
+        idempotencyKey: idempotencyKey,
+      );
+    } catch (error) {
+      debugPrint('Multiplayer match result sync unavailable: $error');
+    }
+    if (!mounted) return;
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => MatchSummaryScreen(
+          userName: widget.userName,
+          characterStyle: widget.characterStyle,
+          isVictory: isWinner,
+          playerScore: myScore,
+          opponentScore: opponentScore,
+          opponentName: widget.opponentName,
+        ),
+      ),
     );
+    if (mounted) _goHome();
   }
 
   void _goBack() {
