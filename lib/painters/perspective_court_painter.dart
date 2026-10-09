@@ -112,7 +112,7 @@ class PerspectiveCourtPainter extends CustomPainter {
     final double maxCourtWidth =
         isLandscape ? size.width * 0.84 : size.width * 0.85;
     final double maxCourtHeight =
-        isLandscape ? size.height * 0.92 : size.height * 0.80;
+        isLandscape ? size.height * 0.78 : size.height * 0.80;
     final double courtHeight = min(
       maxCourtHeight,
       isLandscape ? maxCourtWidth * 1.08 : maxCourtWidth * 1.35,
