@@ -372,6 +372,8 @@ const NET_CLEARANCE = 0.08;
         spin: 0,
         effectiveGravity: GRAVITY,
         bounceCount: 0,
+        bouncedHost: false,
+        bouncedGuest: false,
         serveInFlight: false,
         lastHitBy: hostId,
         servingPlayerId: hostId,
@@ -410,6 +412,8 @@ const NET_CLEARANCE = 0.08;
       state.spin = 0;
       state.effectiveGravity = GRAVITY;
       state.bounceCount = 0;
+      state.bouncedHost = false;
+      state.bouncedGuest = false;
       state.serveInFlight = false;
       state.hostX = 0;
       state.hostY = winnerId === state.hostId ? 1.05 : 0.75;
@@ -449,9 +453,13 @@ const NET_CLEARANCE = 0.08;
       // the same ball before it reaches the other side.
       const incomingToHost = isHost && state.vy > 0;
       const incomingToGuest = !isHost && state.vy < 0;
+      const playerSideHasBounced = isHost
+        ? state.bouncedHost
+        : state.bouncedGuest;
       const canHit = serving || (state.phase === 'rally' &&
         state.lastHitBy !== playerId &&
         (incomingToHost || incomingToGuest) &&
+        playerSideHasBounced &&
         ((isHost && state.ballY > -0.05) || (!isHost && state.ballY < 0.05)));
       if (!canHit) return;
 
@@ -468,11 +476,16 @@ const NET_CLEARANCE = 0.08;
         type === 'LOB' ? 0.3 :
         type === 'ROLL' || type === 'SLICE' ? -0.8 :
         serving ? 0.0 : 0.35;
-      const targetY = isHost ? -targetDepth : targetDepth;
-      const requestedX = Number.isFinite(Number(shotType.x))
-        ? Number(shotType.x)
+      const requestedX = Number.isFinite(Number(shotType.targetX))
+        ? Number(shotType.targetX)
+        : Number.isFinite(Number(shotType.x))
+          ? Number(shotType.x)
         : (isHost ? px : -px);
       const targetX = clamp(isHost ? requestedX : -requestedX, -0.92, 0.92);
+      const requestedY = Number(shotType.targetY);
+      const targetY = Number.isFinite(requestedY)
+        ? clamp(isHost ? requestedY : -requestedY, -0.92, 0.92)
+        : (isHost ? -targetDepth : targetDepth);
       state.ballX = px;
       state.ballY = py;
       state.ballHeight = 0.45;
@@ -618,24 +631,21 @@ const NET_CLEARANCE = 0.08;
       if (state.ballHeight <= 0 && state.vz < 0) {
         state.ballHeight = 0;
         state.bounceCount += 1;
-        if (state.bounceCount === 1) {
-          const outOfBounds = Math.abs(state.ballX) > 1.02 ||
-            Math.abs(state.ballY) > 1.02;
-          const wrongSide = state.lastHitBy === state.hostId
-            ? state.ballY > 0
-            : state.ballY < 0;
-          const shortServe = state.serveInFlight &&
-            Math.abs(state.ballY) < 0.32;
-          if (outOfBounds || wrongSide || shortServe) {
-            awardPoint(state, state.lastHitBy === state.hostId
-              ? state.guestId
-              : state.hostId);
-            return;
-          }
-        } else {
-          awardPoint(state, state.ballY > 0 ? state.guestId : state.hostId);
+        const outOfBounds = Math.abs(state.ballX) > 1.02 ||
+          Math.abs(state.ballY) > 1.02;
+        const wrongSide = state.lastHitBy === state.hostId
+          ? state.ballY > 0
+          : state.ballY < 0;
+        const shortServe = state.serveInFlight &&
+          Math.abs(state.ballY) < 0.32;
+        if (outOfBounds || wrongSide || shortServe) {
+          awardPoint(state, state.lastHitBy === state.hostId
+            ? state.guestId
+            : state.hostId);
           return;
         }
+        if (state.ballY > 0) state.bouncedHost = true;
+        else state.bouncedGuest = true;
         const verticalKeep = clamp(
           BOUNCE_RESTITUTION * (1 - 0.18 * state.spin),
           0.35,
