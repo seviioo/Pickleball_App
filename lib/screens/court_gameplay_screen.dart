@@ -219,7 +219,7 @@ class _CourtGameplayScreenState extends State<CourtGameplayScreen> {
     );
   }
 
-  void _openPauseMenu() {
+  void _openPauseMenu(bool isLandscape) {
     game.pauseGame();
     showDialog(
       context: context,
@@ -229,88 +229,183 @@ class _CourtGameplayScreenState extends State<CourtGameplayScreen> {
           backgroundColor: const Color(0xFF18181B),
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          child: Padding(
-            padding: const EdgeInsets.all(24.0),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.pause_circle_filled,
-                    color: Color(0xFFFACC15), size: 56),
-                const SizedBox(height: 12),
-                const Text('MATCH PAUSED',
-                    style: TextStyle(
+          child: SafeArea(
+            child: SingleChildScrollView(
+              child: Padding(
+                padding: EdgeInsets.symmetric(
+                  vertical: isLandscape ? 12.0 : 24.0,
+                  horizontal: isLandscape ? 20.0 : 24.0,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.pause_circle_filled,
+                      color: const Color(0xFFFACC15),
+                      size: isLandscape ? 36 : 56,
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'MATCH PAUSED',
+                      style: TextStyle(
                         color: Colors.white,
-                        fontSize: 22,
-                        fontWeight: FontWeight.w900)),
-                const SizedBox(height: 24),
-                SizedBox(
-                  width: double.infinity,
-                  height: 48,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFFACC15),
-                      foregroundColor: Colors.black,
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900,
+                      ),
                     ),
-                    onPressed: () {
-                      game.resumeGame();
-                      Navigator.pop(context);
-                    },
-                    child: const Text('RESUME MATCH',
-                        style: TextStyle(fontWeight: FontWeight.w900)),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                SizedBox(
-                  width: double.infinity,
-                  height: 48,
-                  child: OutlinedButton(
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.white,
-                      side: const BorderSide(color: Colors.white24),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
-                    ),
-                    onPressed: () {
-                      Navigator.pop(context);
-                      setState(() {
-                        _hasShownGameOverModal = false;
-                        game.resetPositions(isPlayerServing: true);
-                        game.playerScore = 0;
-                        game.opponentScore = 0;
-                        game.isGameOver = false;
-                      });
-                    },
-                    child: const Text('RESTART MATCH',
-                        style: TextStyle(fontWeight: FontWeight.bold)),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                SizedBox(
-                  width: double.infinity,
-                  height: 48,
-                  child: TextButton.icon(
-                    style: TextButton.styleFrom(
-                        foregroundColor: const Color(0xFFEF4444)),
-                    onPressed: () {
-                      Navigator.pushAndRemoveUntil(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => LobbyScreen(
-                            userName: widget.userName,
-                            characterStyle: widget.characterStyle,
+                    SizedBox(height: isLandscape ? 12 : 20),
+                    if (isLandscape)
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          Expanded(
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFFFACC15),
+                                foregroundColor: Colors.black,
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12)),
+                              ),
+                              onPressed: () {
+                                game.resumeGame();
+                                Navigator.pop(context);
+                              },
+                              child: const Text('RESUME',
+                                  style: TextStyle(
+                                      fontWeight: FontWeight.w900,
+                                      fontSize: 12)),
+                            ),
                           ),
-                        ),
-                        (route) => false,
-                      );
-                    },
-                    icon: const Icon(Icons.home, size: 20),
-                    label: const Text('QUIT TO LOBBY',
-                        style: TextStyle(fontWeight: FontWeight.bold)),
-                  ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: OutlinedButton(
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: Colors.white,
+                                side: const BorderSide(color: Colors.white24),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12)),
+                              ),
+                              onPressed: () {
+                                Navigator.pop(context);
+                                setState(() {
+                                  _hasShownGameOverModal = false;
+                                  game.resetPositions(isPlayerServing: true);
+                                  game.playerScore = 0;
+                                  game.opponentScore = 0;
+                                  game.isGameOver = false;
+                                });
+                              },
+                              child: const Text('RESTART',
+                                  style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12)),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: TextButton.icon(
+                              style: TextButton.styleFrom(
+                                foregroundColor: const Color(0xFFEF4444),
+                              ),
+                              onPressed: () {
+                                Navigator.pushAndRemoveUntil(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => LobbyScreen(
+                                      userName: widget.userName,
+                                      characterStyle: widget.characterStyle,
+                                    ),
+                                  ),
+                                  (route) => false,
+                                );
+                              },
+                              icon: const Icon(Icons.home, size: 16),
+                              label: const Text('QUIT',
+                                  style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12)),
+                            ),
+                          ),
+                        ],
+                      )
+                    else
+                      Column(
+                        children: [
+                          SizedBox(
+                            width: double.infinity,
+                            height: 48,
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFFFACC15),
+                                foregroundColor: Colors.black,
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12)),
+                              ),
+                              onPressed: () {
+                                game.resumeGame();
+                                Navigator.pop(context);
+                              },
+                              child: const Text('RESUME MATCH',
+                                  style:
+                                      TextStyle(fontWeight: FontWeight.w900)),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          SizedBox(
+                            width: double.infinity,
+                            height: 48,
+                            child: OutlinedButton(
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: Colors.white,
+                                side: const BorderSide(color: Colors.white24),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12)),
+                              ),
+                              onPressed: () {
+                                Navigator.pop(context);
+                                setState(() {
+                                  _hasShownGameOverModal = false;
+                                  game.resetPositions(isPlayerServing: true);
+                                  game.playerScore = 0;
+                                  game.opponentScore = 0;
+                                  game.isGameOver = false;
+                                });
+                              },
+                              child: const Text('RESTART MATCH',
+                                  style:
+                                      TextStyle(fontWeight: FontWeight.bold)),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          SizedBox(
+                            width: double.infinity,
+                            height: 48,
+                            child: TextButton.icon(
+                              style: TextButton.styleFrom(
+                                  foregroundColor: const Color(0xFFEF4444)),
+                              onPressed: () {
+                                Navigator.pushAndRemoveUntil(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => LobbyScreen(
+                                      userName: widget.userName,
+                                      characterStyle: widget.characterStyle,
+                                    ),
+                                  ),
+                                  (route) => false,
+                                );
+                              },
+                              icon: const Icon(Icons.home, size: 20),
+                              label: const Text('QUIT TO LOBBY',
+                                  style:
+                                      TextStyle(fontWeight: FontWeight.bold)),
+                            ),
+                          ),
+                        ],
+                      ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
         );
@@ -364,7 +459,7 @@ class _CourtGameplayScreenState extends State<CourtGameplayScreen> {
                       isAiShrunk: isAiShrunk,
                       timingFeedback: timingFeedback,
                       playerColor: widget.characterStyle.outfitPrimary,
-                      playerPaddle: widget.paddle, // <-- PASSED HERE
+                      playerPaddle: widget.paddle,
                       isUltimateActive: isUltimateActive,
                       playerAnimState: playerAnimState,
                       aiAnimState: aiAnimState,
@@ -413,9 +508,15 @@ class _CourtGameplayScreenState extends State<CourtGameplayScreen> {
                     children: [
                       Row(
                         children: [
-                          _buildHeaderIconButton(Icons.pause, _openPauseMenu),
+                          _buildHeaderIconButton(
+                            Icons.pause,
+                            () => _openPauseMenu(isLandscape),
+                          ),
                           const SizedBox(width: 8),
-                          _buildHeaderIconButton(Icons.home, _openPauseMenu),
+                          _buildHeaderIconButton(
+                            Icons.home,
+                            () => _openPauseMenu(isLandscape),
+                          ),
                         ],
                       ),
                       Container(

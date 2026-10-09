@@ -309,86 +309,84 @@ class _MultiplayerCourtScreenState extends State<MultiplayerCourtScreen> {
               ),
             ),
 
-            // The AI screen uses pause and home in the side header.
+            // Top Responsive Header HUD Bar
             Positioned(
-              top: isLandscape ? 8 : 12,
-              left: isLandscape ? 12 : 8,
+              top: 12,
+              left: 12,
+              right: 12,
               child: Row(
                 children: [
-                  _buildNavigationButton(
-                    icon: _paused ? Icons.play_arrow_rounded : Icons.pause,
-                    onPressed: _togglePause,
-                    tooltip: _paused ? 'Resume' : 'Pause',
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _buildNavigationButton(
+                        icon: _paused ? Icons.play_arrow_rounded : Icons.pause,
+                        onPressed: _togglePause,
+                        tooltip: _paused ? 'Resume' : 'Pause',
+                      ),
+                      const SizedBox(width: 6),
+                      _buildNavigationButton(
+                        icon: Icons.arrow_back_rounded,
+                        onPressed: _goBack,
+                        tooltip: 'Back',
+                      ),
+                      const SizedBox(width: 6),
+                      _buildNavigationButton(
+                        icon: Icons.home_rounded,
+                        onPressed: _goHome,
+                        tooltip: 'Home',
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 6),
-                  _buildNavigationButton(
-                    icon: Icons.arrow_back_rounded,
-                    onPressed: _goBack,
-                    tooltip: 'Back',
+                  const Spacer(),
+                  // Flexible Scoreboard Box
+                  Flexible(
+                    flex: 4,
+                    child: Container(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: isLandscape ? 14 : 10,
+                        vertical: isLandscape ? 6 : 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF18181B),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                            color: const Color(0xFFFACC15), width: 2),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.radio,
+                            color: Color(0xFFFACC15),
+                            size: 18,
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              '${widget.userName}: $myScore  |  ${widget.opponentName}: $opponentScore',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: isLandscape ? 14 : 13,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
-                  const SizedBox(width: 6),
-                  _buildNavigationButton(
-                    icon: Icons.home_rounded,
-                    onPressed: _goHome,
-                    tooltip: 'Home',
-                  ),
+                  const Spacer(),
                 ],
               ),
             ),
 
-            // Header Scoreboard
+            // Status Banner Positioned Safely Clear of Opponent Character
             Positioned(
-              top: isLandscape ? 8 : 12,
-              left: isLandscape ? 150 : 124,
-              right: isLandscape ? 150 : 8,
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(
-                    maxWidth: isLandscape ? 400 : 260,
-                  ),
-                  child: Container(
-                    width: double.infinity,
-                    padding: EdgeInsets.symmetric(
-                      horizontal: isLandscape ? 12 : 10,
-                      vertical: isLandscape ? 4 : 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF18181B),
-                      borderRadius: BorderRadius.circular(12),
-                      border:
-                          Border.all(color: const Color(0xFFFACC15), width: 2),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.radio,
-                          color: Color(0xFFFACC15),
-                          size: 18,
-                        ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            '${widget.userName}: $myScore  |  ${widget.opponentName}: $opponentScore',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: isLandscape ? 14 : 13,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-
-            // Status Banner
-            Positioned(
-              top: isLandscape ? 54 : 82,
+              top: isLandscape ? 56 : 68,
               left: 0,
               right: 0,
               child: Center(
