@@ -452,8 +452,10 @@ const NET_CLEARANCE = 0.08;
         type === 'ROLL' || type === 'SLICE' ? -0.8 :
         serving ? 0.0 : 0.35;
       const targetY = isHost ? -targetDepth : targetDepth;
-      const targetX = clamp(Number.isFinite(Number(shotType.x))
-        ? Number(shotType.x) : px, -0.92, 0.92);
+      const requestedX = Number.isFinite(Number(shotType.x))
+        ? Number(shotType.x)
+        : (isHost ? px : -px);
+      const targetX = clamp(isHost ? requestedX : -requestedX, -0.92, 0.92);
       state.ballX = px;
       state.ballY = py;
       state.ballHeight = 0.45;
@@ -518,7 +520,7 @@ const NET_CLEARANCE = 0.08;
       const move = (value) => clamp(Number(value) || 0, -1, 1);
       state.hostX = clamp(state.hostX + move(hostInput.dx) * 1.4 * dt, -0.92, 0.92);
       state.hostY = clamp(state.hostY + move(hostInput.dy) * 1.4 * dt, 0.2, 1.15);
-      state.guestX = clamp(state.guestX + move(guestInput.dx) * 1.4 * dt, -0.92, 0.92);
+      state.guestX = clamp(state.guestX - move(guestInput.dx) * 1.4 * dt, -0.92, 0.92);
       state.guestY = clamp(state.guestY - move(guestInput.dy) * 1.4 * dt, -1.15, -0.2);
       for (const [key, input] of [[state.hostId, hostInput], [state.guestId, guestInput]]) {
         const moving = Math.abs(input.dx) > 0.1 || Math.abs(input.dy) > 0.1;
@@ -621,9 +623,9 @@ const NET_CLEARANCE = 0.08;
         ballX: flip(state.ballX),
         ballY: flip(state.ballY),
         ballHeight: state.ballHeight,
-        myX: hostView ? state.hostX : state.guestX,
+        myX: hostView ? state.hostX : -state.guestX,
         myY: hostView ? state.hostY : -state.guestY,
-        opponentX: hostView ? state.guestX : state.hostX,
+        opponentX: hostView ? state.guestX : -state.hostX,
         opponentY: hostView ? state.guestY : -state.hostY,
         playerAnimState: hostView ? state.animation.host : state.animation.guest,
         opponentAnimState: hostView ? state.animation.guest : state.animation.host,
