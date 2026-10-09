@@ -160,10 +160,10 @@ class _MultiplayerCourtScreenState extends State<MultiplayerCourtScreen> {
         (matchPhase != 'ready' && matchPhase != 'rally')) {
       return;
     }
-    final targetY = _aimTargetY;
+    final targetY = _aimTargetY(type);
     SocketService.instance.sendEvent('SHOT', {
       'shotType': type,
-      'targetX': _aimDirection.dx.clamp(-0.92, 0.92).toDouble(),
+      'targetX': _aimTargetX,
       'targetY': targetY,
       'y': myY,
       'aimX': _aimDirection.dx,
@@ -171,8 +171,36 @@ class _MultiplayerCourtScreenState extends State<MultiplayerCourtScreen> {
     });
   }
 
-  double get _aimTargetY =>
-      (_aimDirection.dy * 0.35 - 0.65).clamp(-0.92, -0.20).toDouble();
+  bool get _isAimingSideways => _aimDirection.dx.abs() > 0.25;
+
+  double get _aimTargetX {
+    if (!_isAimingSideways) return 0.0;
+    if (matchPhase == 'ready') {
+      return (_aimDirection.dx * 0.6).clamp(-0.7, 0.7).toDouble();
+    }
+    return (_aimDirection.dx.sign * (0.35 + 0.5 * _aimDirection.dx.abs()))
+        .clamp(-0.92, 0.92)
+        .toDouble();
+  }
+
+  double _aimTargetY([String shotType = 'DRIVE']) {
+    final baseY = matchPhase == 'ready'
+        ? -0.65
+        : shotType == 'ROLL' || shotType == 'SLICE'
+            ? -0.28
+            : shotType == 'LOB'
+                ? -0.85
+                : shotType == 'SMASH'
+                    ? -0.80
+                    : -0.75;
+    final dy = _aimDirection.dy;
+    if (matchPhase == 'ready' || dy.abs() < 0.35) return baseY;
+    if (shotType == 'ROLL' || shotType == 'SLICE') {
+      return (baseY + dy * 0.06).clamp(-0.36, -0.20).toDouble();
+    }
+    final range = shotType == 'LOB' ? 0.06 : 0.20;
+    return (baseY + dy * range).clamp(-0.92, -0.35).toDouble();
+  }
 
   void _updateAim(Offset direction) {
     _aimDirection = direction;
@@ -300,8 +328,8 @@ class _MultiplayerCourtScreenState extends State<MultiplayerCourtScreen> {
                   ballInReach: _hasAuthoritativeState &&
                       ((matchPhase == 'ready' && isPlayerServing) ||
                           (matchPhase == 'rally' && ballHeight < 0.8)),
-                  aimX: _aimDirection.dx.clamp(-0.92, 0.92),
-                  aimY: _aimTargetY,
+                  aimX: _aimTargetX,
+                  aimY: _aimTargetY(),
                   aimScatter: 0.15,
                   showAim: _hasAuthoritativeState &&
                       !_paused &&
