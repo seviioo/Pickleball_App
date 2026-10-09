@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../models/game_models.dart';
 import '../services/api_service.dart';
 import '../services/socket_service.dart';
+import '../services/storage_service.dart';
 import '../theme/app_theme.dart';
 import 'multiplayer_court_screen.dart';
 
@@ -26,18 +28,53 @@ class MultiplayerLobbyScreen extends StatefulWidget {
 
 class _MultiplayerLobbyScreenState extends State<MultiplayerLobbyScreen> {
   String? opponentName;
+  StreamSubscription<Map<String, dynamic>>? _socketSub;
+  Timer? _roomPollTimer;
+  bool _openingCourt = false;
 
   @override
   void initState() {
     super.initState();
     _connectSocket();
+    _roomPollTimer = Timer.periodic(
+      const Duration(seconds: 2),
+      (_) => _checkRoomStatus(),
+    );
   }
 
-  void _connectSocket() {
-    final wsUrl = ApiService.baseUrl.replaceFirst('http', 'ws');
-    SocketService.instance.connect(wsUrl, widget.roomCode, widget.userName);
+  Future<void> _checkRoomStatus() async {
+    if (_openingCourt || !mounted) return;
+    final room = await ApiService.getRoomStatus(widget.roomCode);
+    if (room == null || !mounted || _openingCourt) return;
 
-    SocketService.instance.stream.listen((event) {
+    final players = room['players'];
+    if (players is List) {
+      String? detectedOpponent;
+      for (final entry in players) {
+        if (entry is! Map) continue;
+        final player = entry['playerId'];
+        if (player is! Map) continue;
+        final displayName = player['displayName'];
+        if (displayName is String &&
+            displayName.isNotEmpty &&
+            displayName != widget.userName) {
+          detectedOpponent = displayName;
+          break;
+        }
+      }
+      if (detectedOpponent != null && detectedOpponent != opponentName) {
+        setState(() {
+          opponentName = detectedOpponent;
+        });
+      }
+    }
+
+    if (room['status'] == 'in_progress') _openCourt();
+  }
+
+  Future<void> _connectSocket() async {
+    final clientId = await StorageService.getOrCreateClientId();
+    _socketSub = SocketService.instance.stream.listen((event) {
       if (!mounted) return;
       final type = event['type'];
 
@@ -45,30 +82,63 @@ class _MultiplayerLobbyScreenState extends State<MultiplayerLobbyScreen> {
         setState(() {
           opponentName = event['username'];
         });
+      } else if (type == 'ROOM_STATE') {
+        final players = event['players'];
+        if (players is List && players.isNotEmpty) {
+          setState(() {
+            opponentName = players.first as String;
+          });
+        }
       } else if (type == 'MATCH_STARTED') {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => MultiplayerCourtScreen(
-              userName: widget.userName,
-              characterStyle: widget.characterStyle,
-              roomCode: widget.roomCode,
-              isHost: widget.isHost,
-              opponentName: opponentName ?? 'Opponent',
-            ),
-          ),
-        );
+        _openCourt();
       }
     });
+
+    final wsUrl = ApiService.baseUrl.replaceFirst('http', 'ws');
+    SocketService.instance
+        .connect(wsUrl, widget.roomCode, widget.userName, clientId);
   }
 
   void _startMatch() async {
-    final success =
-        await ApiService.startRoomMatch(widget.roomCode, widget.userName);
-    if (success) {
-      SocketService.instance
-          .sendEvent('START_MATCH', {'roomCode': widget.roomCode});
+    String? errorMessage;
+    final success = await ApiService.startRoomMatch(
+      widget.roomCode,
+      widget.userName,
+      onError: (message) => errorMessage = message,
+    );
+    if (!success && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(errorMessage ?? 'Unable to start the match.'),
+          backgroundColor: AppColors.redBright,
+        ),
+      );
     }
+  }
+
+  void _openCourt() {
+    if (_openingCourt || !mounted) return;
+    _openingCourt = true;
+    _roomPollTimer?.cancel();
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (context) => MultiplayerCourtScreen(
+          userName: widget.userName,
+          characterStyle: widget.characterStyle,
+          roomCode: widget.roomCode,
+          isHost: widget.isHost,
+          opponentName: opponentName ?? 'Opponent',
+        ),
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _roomPollTimer?.cancel();
+    _socketSub?.cancel();
+    super.dispose();
   }
 
   @override

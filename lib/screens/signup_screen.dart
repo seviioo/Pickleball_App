@@ -16,6 +16,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
   final _usernameController = TextEditingController();
   final _ageController = TextEditingController();
   bool _isLoading = false;
+  bool _isPasswordVisible = false;
 
   bool _isValidEmail(String email) {
     return RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email);
@@ -41,8 +42,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
       return;
     }
 
-    if (password.length < 6) {
-      _showError('Password must be at least 6 characters long.');
+    if (password.length < 8) {
+      _showError('Password must be at least 8 characters long.');
       return;
     }
 
@@ -130,7 +131,13 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       controller: _passwordController,
                       hint: 'Password',
                       icon: Icons.lock_outline,
-                      obscureText: true),
+                      obscureText: !_isPasswordVisible,
+                      isPassword: true,
+                      onTogglePassword: () {
+                        setState(() {
+                          _isPasswordVisible = !_isPasswordVisible;
+                        });
+                      }),
                   const SizedBox(height: 24),
                   _isLoading
                       ? const CircularProgressIndicator(color: AppColors.gold)
@@ -152,6 +159,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
     required String hint,
     required IconData icon,
     bool obscureText = false,
+    bool isPassword = false,
+    VoidCallback? onTogglePassword,
     TextInputType keyboardType = TextInputType.text,
   }) {
     return Container(
@@ -168,6 +177,18 @@ class _SignUpScreenState extends State<SignUpScreen> {
             color: AppColors.textPrimary, fontWeight: FontWeight.w700),
         decoration: InputDecoration(
           prefixIcon: Icon(icon, color: AppColors.gold, size: 20),
+          suffixIcon: isPassword
+              ? IconButton(
+                  icon: Icon(
+                    obscureText
+                        ? Icons.visibility_outlined
+                        : Icons.visibility_off_outlined,
+                    color: AppColors.gold,
+                  ),
+                  tooltip: obscureText ? 'Show password' : 'Hide password',
+                  onPressed: onTogglePassword,
+                )
+              : null,
           hintText: hint,
           hintStyle: const TextStyle(color: AppColors.textFaint),
           border: InputBorder.none,

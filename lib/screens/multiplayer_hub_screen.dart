@@ -34,7 +34,12 @@ class _MultiplayerHubScreenState extends State<MultiplayerHubScreen> {
     final roomCode = _generateRandomRoomCode();
     setState(() => _isLoading = true);
 
-    final result = await ApiService.createRoom(roomCode, widget.userName);
+    String? errorMessage;
+    final result = await ApiService.createRoom(
+      roomCode,
+      widget.userName,
+      onError: (message) => errorMessage = message,
+    );
     setState(() => _isLoading = false);
 
     if (result != null) {
@@ -51,7 +56,7 @@ class _MultiplayerHubScreenState extends State<MultiplayerHubScreen> {
         ),
       );
     } else {
-      _showError('Failed to create room. Check backend connection.');
+      _showError(errorMessage ?? 'Failed to create room.');
     }
   }
 
@@ -63,7 +68,12 @@ class _MultiplayerHubScreenState extends State<MultiplayerHubScreen> {
     }
 
     setState(() => _isLoading = true);
-    final result = await ApiService.joinRoom(code, widget.userName);
+    String? errorMessage;
+    final result = await ApiService.joinRoom(
+      code,
+      widget.userName,
+      onError: (message) => errorMessage = message,
+    );
     setState(() => _isLoading = false);
 
     if (result != null) {
@@ -80,7 +90,7 @@ class _MultiplayerHubScreenState extends State<MultiplayerHubScreen> {
         ),
       );
     } else {
-      _showError('Invalid room code or room is full.');
+      _showError(errorMessage ?? 'Unable to join the room.');
     }
   }
 

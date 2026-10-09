@@ -8,6 +8,7 @@ import { randomBytes, randomUUID, scryptSync, timingSafeEqual } from 'node:crypt
 const app = express();
 const port = Number(process.env.PORT || 3000);
 const socketsByRoom = new Map();
+const matchStates = new Map();
 
 app.use(cors({ origin: process.env.CORS_ORIGIN || '*' }));
 app.use(express.json({ limit: '32kb' }));
@@ -255,10 +256,17 @@ app.post('/api/rooms', asyncRoute(async (request, response) => {
 
 app.post('/api/rooms/:roomCode/join', asyncRoute(async (request, response) => {
   const player = await Player.findOne({ clientId: request.body.clientId });
-  const room = await GameRoom.findOne({ roomCode: request.params.roomCode.toUpperCase(), status: 'waiting' });
+  const room = await GameRoom.findOne({ roomCode: request.params.roomCode.toUpperCase() });
   if (!player) return response.status(404).json({ error: 'Player not found' });
-  if (!room) return response.status(404).json({ error: 'Room not found or no longer accepting players' });
+  if (!room) return response.status(404).json({ error: 'Room not found' });
   if (room.players.some((entry) => entry.playerId.equals(player._id))) return response.json(room);
+  if (room.status !== 'waiting') {
+    return response.status(409).json({
+      error: room.status === 'ready' || room.status === 'in_progress'
+        ? 'Room is full or the match has already started'
+        : 'Room is no longer accepting players'
+    });
+  }
   if (room.players.length >= room.maxPlayers) return response.status(409).json({ error: 'Room is full' });
 
   room.players.push({ playerId: player._id, role: 'player' });
@@ -295,6 +303,7 @@ app.post('/api/rooms/:roomCode/start', asyncRoute(async (request, response) => {
   room.matchId = match._id;
   room.status = 'in_progress';
   await room.save();
+  getMatchState(room);
   await MatchEvent.create({
     matchId: match._id,
     sequence: 0,
@@ -333,6 +342,309 @@ function broadcastToRoom(roomCode, message, excludedSocket = null) {
     }
   }
 }
+
+const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+const GRAVITY = 8.0;
+const AIR_DRAG = 0.35;
+const BOUNCE_RESTITUTION = 0.66;
+const BOUNCE_FRICTION = 0.82;
+const SPIN_MAGNUS = 0.5;
+const NET_HEIGHT = 0.55;
+const NET_CLEARANCE = 0.08;
+
+    function createMatchState(room) {
+      const hostId = room.players[0].playerId.toString();
+      const guestId = room.players[1].playerId.toString();
+      return {
+        roomCode: room.roomCode,
+        hostId,
+        guestId,
+        hostX: 0,
+        hostY: 1.05,
+        guestX: 0,
+        guestY: -0.75,
+        ballX: 0.08,
+        ballY: 1.03,
+        ballHeight: 0.4,
+        vx: 0,
+        vy: 0,
+        vz: 0,
+        spin: 0,
+        effectiveGravity: GRAVITY,
+        bounceCount: 0,
+        serveInFlight: false,
+        lastHitBy: hostId,
+        servingPlayerId: hostId,
+        phase: 'ready',
+        score: { host: 0, guest: 0 },
+        status: 'YOUR SERVE',
+        sequence: 0,
+        lastTick: Date.now(),
+        animation: { host: 'idle', guest: 'idle' },
+        frames: { host: 0, guest: 0 },
+        input: new Map(),
+        inputAt: new Map(),
+      };
+    }
+
+    function getMatchState(room) {
+      let state = matchStates.get(room.roomCode);
+      if (!state && room.players.length >= 2 && room.matchId) {
+        state = createMatchState(room);
+        matchStates.set(room.roomCode, state);
+      }
+      return state;
+    }
+
+    function awardPoint(state, winnerId) {
+      if (winnerId === state.hostId) state.score.host += 1;
+      else state.score.guest += 1;
+      state.servingPlayerId = winnerId;
+      state.phase = 'ready';
+      state.vx = 0;
+      state.vy = 0;
+      state.vz = 0;
+      state.spin = 0;
+      state.effectiveGravity = GRAVITY;
+      state.bounceCount = 0;
+      state.serveInFlight = false;
+      state.hostX = 0;
+      state.hostY = winnerId === state.hostId ? 1.05 : 0.75;
+      state.guestX = 0;
+      state.guestY = winnerId === state.guestId ? -1.05 : -0.75;
+      state.ballX = winnerId === state.hostId ? 0.08 : -0.08;
+      state.ballY = winnerId === state.hostId ? 1.03 : -1.03;
+      state.ballHeight = winnerId === state.hostId ? 0.4 : 0.3;
+      state.status = winnerId === state.hostId ? 'YOUR SERVE' : 'OPPONENT SERVE';
+      state.animation.host = 'idle';
+      state.animation.guest = 'idle';
+      state.frames.host = 0;
+      state.frames.guest = 0;
+      if ((state.score.host >= 11 || state.score.guest >= 11) &&
+          Math.abs(state.score.host - state.score.guest) >= 2) {
+        state.phase = 'match_over';
+        state.status = state.score.host > state.score.guest
+          ? 'MATCH OVER! HOST WINS!'
+          : 'MATCH OVER! GUEST WINS!';
+      }
+    }
+
+    function startServerShot(state, playerId, shotType) {
+      const isHost = playerId === state.hostId;
+      const px = isHost ? state.hostX : state.guestX;
+      const py = isHost ? state.hostY : state.guestY;
+      const serving = state.phase === 'ready' && state.servingPlayerId === playerId;
+      const canHit = serving || (state.phase === 'rally' &&
+        ((isHost && state.ballY > -0.05) || (!isHost && state.ballY < 0.05)));
+      if (!canHit) return;
+
+      const type = String(shotType.type || 'DRIVE').toUpperCase();
+      const targetDepth = type === 'SMASH' ? 0.80 :
+        type === 'LOB' ? 0.85 :
+        type === 'ROLL' || type === 'SLICE' ? 0.28 :
+        serving ? 0.65 : 0.72;
+      const airTime = type === 'SMASH' ? 0.60 :
+        type === 'LOB' ? 1.15 :
+        type === 'ROLL' || type === 'SLICE' ? 0.85 :
+        serving ? 0.95 : 0.80;
+      const spin = type === 'SMASH' ? 0.7 :
+        type === 'LOB' ? 0.3 :
+        type === 'ROLL' || type === 'SLICE' ? -0.8 :
+        serving ? 0.0 : 0.35;
+      const targetY = isHost ? -targetDepth : targetDepth;
+      const targetX = clamp(Number.isFinite(Number(shotType.x))
+        ? Number(shotType.x) : px, -0.92, 0.92);
+      state.ballX = px;
+      state.ballY = py;
+      state.ballHeight = 0.45;
+      const dx = targetX - state.ballX;
+      const dy = targetY - state.ballY;
+      const crossesNet = state.ballY * targetY < 0;
+      let vx = 0;
+      let vy = 0;
+      let vz = 0;
+      let effectiveGravity = GRAVITY;
+      let flightTime = airTime;
+      for (let i = 0; i < 12; i += 1) {
+        const decay = 1 - Math.exp(-AIR_DRAG * flightTime);
+        vx = dx * AIR_DRAG / decay;
+        vy = dy * AIR_DRAG / decay;
+        const speed = Math.sqrt(vx * vx + vy * vy);
+        effectiveGravity = Math.max(
+          GRAVITY + spin * SPIN_MAGNUS * speed,
+          3.0
+        );
+        vz = (effectiveGravity * flightTime / AIR_DRAG - state.ballHeight) *
+          AIR_DRAG / decay - effectiveGravity / AIR_DRAG;
+        if (!crossesNet || Math.abs(vy) < 0.0001) break;
+        const argument = 1 + state.ballY * AIR_DRAG / vy;
+        if (argument <= 0) break;
+        const netTime = -Math.log(argument) / AIR_DRAG;
+        const netHeight = state.ballHeight +
+          (vz + effectiveGravity / AIR_DRAG) *
+            (1 - Math.exp(-AIR_DRAG * netTime)) / AIR_DRAG -
+          effectiveGravity * netTime / AIR_DRAG;
+        if (netHeight >= NET_HEIGHT + NET_CLEARANCE) break;
+        flightTime += 0.05;
+      }
+      state.vx = vx;
+      state.vy = vy;
+      state.vz = vz;
+      state.spin = spin;
+      state.effectiveGravity = effectiveGravity;
+      state.bounceCount = 0;
+      state.serveInFlight = serving;
+      state.lastHitBy = playerId;
+      state.phase = 'rally';
+      state.status = `${isHost ? 'HOST' : 'GUEST'} ${type}`;
+      state.animation[isHost ? 'host' : 'guest'] =
+        serving ? 'serving' :
+        type === 'SMASH' ? 'smash' :
+        type === 'LOB' ? 'lob' :
+        type === 'ROLL' || type === 'SLICE' ? 'slice' : 'drive';
+      state.frames[isHost ? 'host' : 'guest'] = 0;
+    }
+
+    function updateMatchState(state, dt) {
+      if (state.phase === 'match_over') return;
+      const activeInput = (playerId) => {
+        const lastInput = state.inputAt.get(playerId) || 0;
+        return Date.now() - lastInput < 180
+          ? state.input.get(playerId) || { dx: 0, dy: 0 }
+          : { dx: 0, dy: 0 };
+      };
+      const hostInput = activeInput(state.hostId);
+      const guestInput = activeInput(state.guestId);
+      const move = (value) => clamp(Number(value) || 0, -1, 1);
+      state.hostX = clamp(state.hostX + move(hostInput.dx) * 1.4 * dt, -0.92, 0.92);
+      state.hostY = clamp(state.hostY + move(hostInput.dy) * 1.4 * dt, 0.2, 1.15);
+      state.guestX = clamp(state.guestX + move(guestInput.dx) * 1.4 * dt, -0.92, 0.92);
+      state.guestY = clamp(state.guestY - move(guestInput.dy) * 1.4 * dt, -1.15, -0.2);
+      for (const [key, input] of [[state.hostId, hostInput], [state.guestId, guestInput]]) {
+        const moving = Math.abs(input.dx) > 0.1 || Math.abs(input.dy) > 0.1;
+        state.animation[key === state.hostId ? 'host' : 'guest'] = moving ? 'walking' : 'idle';
+      }
+
+      if (state.phase === 'ready') {
+        if (state.servingPlayerId === state.hostId) {
+          state.ballX = state.hostX + 0.08;
+          state.ballY = state.hostY - 0.02;
+          state.ballHeight = 0.4;
+        } else {
+          state.ballX = state.guestX - 0.08;
+          state.ballY = state.guestY + 0.02;
+          state.ballHeight = 0.3;
+        }
+        return;
+      }
+
+      const dragFactor = Math.exp(-AIR_DRAG * dt);
+      const previousY = state.ballY;
+      state.ballX += state.vx * (1 - dragFactor) / AIR_DRAG;
+      state.ballY += state.vy * (1 - dragFactor) / AIR_DRAG;
+      state.ballHeight +=
+        (state.vz + state.effectiveGravity / AIR_DRAG) *
+          (1 - dragFactor) / AIR_DRAG -
+        state.effectiveGravity * dt / AIR_DRAG;
+      state.vx *= dragFactor;
+      state.vy *= dragFactor;
+      state.vz = state.vz * dragFactor -
+        state.effectiveGravity * (1 - dragFactor) / AIR_DRAG;
+
+      if (previousY * state.ballY < 0 && state.ballHeight < NET_HEIGHT) {
+        awardPoint(state, state.lastHitBy === state.hostId
+          ? state.guestId
+          : state.hostId);
+        return;
+      }
+      if (state.ballHeight <= 0 && state.vz < 0) {
+        state.ballHeight = 0;
+        state.bounceCount += 1;
+        if (state.bounceCount === 1) {
+          const outOfBounds = Math.abs(state.ballX) > 1.02 ||
+            Math.abs(state.ballY) > 1.02;
+          const wrongSide = state.lastHitBy === state.hostId
+            ? state.ballY > 0
+            : state.ballY < 0;
+          const shortServe = state.serveInFlight &&
+            Math.abs(state.ballY) < 0.32;
+          if (outOfBounds || wrongSide || shortServe) {
+            awardPoint(state, state.lastHitBy === state.hostId
+              ? state.guestId
+              : state.hostId);
+            return;
+          }
+        } else {
+          awardPoint(state, state.ballY > 0 ? state.guestId : state.hostId);
+          return;
+        }
+        const verticalKeep = clamp(
+          BOUNCE_RESTITUTION * (1 - 0.18 * state.spin),
+          0.35,
+          0.85
+        );
+        const horizontalKeep = clamp(
+          BOUNCE_FRICTION * (1 + 0.22 * state.spin),
+          0.45,
+          1.05
+        );
+        state.vz = -state.vz * verticalKeep;
+        state.vx *= horizontalKeep;
+        state.vy *= horizontalKeep;
+        state.effectiveGravity =
+          GRAVITY + (state.effectiveGravity - GRAVITY) * 0.4;
+        state.spin *= 0.4;
+      }
+    }
+
+    function snapshotFor(state, playerId) {
+      const hostView = playerId === state.hostId;
+      const flip = (value) => hostView ? value : -value;
+      let status = state.status;
+      if (state.phase === 'ready') {
+        status = state.servingPlayerId === playerId
+          ? 'YOUR SERVE'
+          : 'OPPONENT SERVE';
+      } else {
+        status = status.replace(hostView ? 'HOST' : 'GUEST', 'YOUR');
+        status = status.replace(hostView ? 'GUEST' : 'HOST', 'OPPONENT');
+      }
+      return {
+        type: 'STATE',
+        sequence: state.sequence,
+        phase: state.phase,
+        status,
+        isGameOver: state.score.host >= 11 || state.score.guest >= 11,
+        myScore: hostView ? state.score.host : state.score.guest,
+        opponentScore: hostView ? state.score.guest : state.score.host,
+        isServing: state.servingPlayerId === playerId,
+        ballX: flip(state.ballX),
+        ballY: flip(state.ballY),
+        ballHeight: state.ballHeight,
+        myX: hostView ? state.hostX : state.guestX,
+        myY: hostView ? state.hostY : -state.guestY,
+        opponentX: hostView ? state.guestX : state.hostX,
+        opponentY: hostView ? state.guestY : -state.hostY,
+        playerAnimState: hostView ? state.animation.host : state.animation.guest,
+        opponentAnimState: hostView ? state.animation.guest : state.animation.host,
+      };
+    }
+
+setInterval(() => {
+  const now = Date.now();
+  for (const state of matchStates.values()) {
+    const dt = Math.min((now - state.lastTick) / 1000, 0.05);
+    state.lastTick = now;
+    updateMatchState(state, dt);
+    state.sequence += 1;
+    const sockets = socketsByRoom.get(state.roomCode) || [];
+    for (const socket of sockets) {
+      if (socket.readyState === 1) {
+        socket.send(JSON.stringify(snapshotFor(state, socket.playerId)));
+      }
+    }
+  }
+}, 50);
 
 app.post('/api/players/:clientId/matches', asyncRoute(async (request, response) => {
   const { clientId } = request.params;
@@ -414,6 +726,7 @@ webSocketServer.on('connection', async (socket, request) => {
   socket.isAlive = true;
   socket.roomCode = roomCode;
   socket.clientId = clientId;
+  socket.playerId = player._id.toString();
   socket.username = username || player.displayName;
 
   socket.on('pong', () => {
@@ -423,11 +736,19 @@ webSocketServer.on('connection', async (socket, request) => {
     try {
       const message = JSON.parse(rawMessage.toString());
       if (!message || typeof message.type !== 'string') return;
-      broadcastToRoom(roomCode, {
-        type: message.type,
-        ...message,
-        username: socket.username,
-      }, socket);
+      const state = matchStates.get(roomCode);
+      if (!state) return;
+      if (message.type === 'MOVE') {
+        const dx = clamp(Number(message.dx) || 0, -1, 1);
+        const dy = clamp(Number(message.dy) || 0, -1, 1);
+        state.input.set(socket.playerId, { dx, dy });
+        state.inputAt.set(socket.playerId, Date.now());
+      } else if (message.type === 'SHOT') {
+        startServerShot(state, socket.playerId, {
+          type: String(message.shotType || 'DRIVE'),
+          x: message.x,
+        });
+      }
     } catch (error) {
       console.error('Invalid WebSocket message:', error);
       socket.send(JSON.stringify({ type: 'ERROR', message: 'Invalid event' }));
@@ -440,6 +761,10 @@ webSocketServer.on('connection', async (socket, request) => {
   });
 
   socket.send(JSON.stringify({ type: 'CONNECTED', username: socket.username }));
+  const state = getMatchState(room);
+  if (state) {
+    socket.send(JSON.stringify(snapshotFor(state, socket.playerId)));
+  }
   const connectedPlayers = room.players
     .map((entry) => entry.playerId.toString())
     .filter((playerId) => playerId !== player._id.toString());

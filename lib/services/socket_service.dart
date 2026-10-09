@@ -17,9 +17,13 @@ class SocketService {
 
   SocketService._();
 
-  void connect(String wsUrl, String roomCode, String username) {
+  void connect(
+      String wsUrl, String roomCode, String username, String clientId) {
     try {
-      final uri = Uri.parse('$wsUrl?roomCode=$roomCode&username=$username');
+      disconnect();
+      final uri = Uri.parse('$wsUrl?roomCode=$roomCode'
+          '&username=${Uri.encodeQueryComponent(username)}'
+          '&clientId=${Uri.encodeQueryComponent(clientId)}');
       _channel = WebSocketChannel.connect(uri);
 
       _channel!.stream.listen(

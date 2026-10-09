@@ -17,11 +17,13 @@ class ApiService {
     required int age,
   }) async {
     try {
+      final clientId = await StorageService.getOrCreateClientId();
       final response = await http.post(
         Uri.parse('$baseUrl/api/auth/register'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'username': username,
+          'clientId': clientId,
           'email': email,
           'password': password,
           'age': age,
@@ -39,6 +41,7 @@ class ApiService {
   static Future<Map<String, dynamic>?> login({
     required String username,
     required String password,
+    String? Function(String message)? onError,
   }) async {
     try {
       final response = await http.post(
@@ -47,10 +50,20 @@ class ApiService {
         body: jsonEncode({'username': username, 'password': password}),
       );
       if (response.statusCode == 200) {
-        return jsonDecode(response.body);
+        final result = jsonDecode(response.body) as Map<String, dynamic>;
+        final clientId = result['clientId'];
+        if (clientId is String) {
+          await StorageService.saveClientId(clientId);
+        }
+        return result;
       }
+      final message = _errorMessage(response);
+      debugPrint('Login failed (${response.statusCode}): $message');
+      onError?.call(message);
     } catch (e) {
       debugPrint('Login API Error: $e');
+      onError?.call(
+          'Unable to reach the online server. Check your internet connection.');
     }
     return null;
   }
@@ -69,57 +82,114 @@ class ApiService {
 
   // --- ROOM MANAGEMENT ---
   static Future<Map<String, dynamic>?> createRoom(
-      String roomCode, String hostUsername) async {
+      String roomCode, String hostUsername,
+      {String? Function(String message)? onError}) async {
     try {
+      final clientId = await StorageService.getOrCreateClientId();
       final response = await http.post(
         Uri.parse('$baseUrl/api/rooms'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'roomCode': roomCode,
-          'hostUsername': hostUsername,
+          'clientId': clientId,
+          'mode': 'casual',
+          'maxPlayers': 2,
         }),
       );
       if (response.statusCode == 200 || response.statusCode == 201) {
         return jsonDecode(response.body);
       }
+      final message = _errorMessage(response);
+      debugPrint(
+          'Create Room failed (${response.statusCode}): $message');
+      onError?.call(message);
     } catch (e) {
       debugPrint('Create Room Error: $e');
+      onError?.call('Unable to reach the online server. Check your internet connection.');
     }
     return null;
   }
 
-  static Future<Map<String, dynamic>?> joinRoom(
-      String roomCode, String guestUsername) async {
+  static String _errorMessage(http.Response response) {
     try {
+      final body = jsonDecode(response.body);
+      if (body is Map && body['error'] is String) {
+        return body['error'] as String;
+      }
+    } catch (_) {
+      // Use the status code when the server did not return JSON.
+    }
+    return 'Server returned HTTP ${response.statusCode}.';
+  }
+
+  static Future<Map<String, dynamic>?> joinRoom(
+      String roomCode, String guestUsername,
+      {String? Function(String message)? onError}) async {
+    try {
+      final clientId = await StorageService.getOrCreateClientId();
       final response = await http.post(
         Uri.parse('$baseUrl/api/rooms/$roomCode/join'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
-          'guestUsername': guestUsername,
+          'clientId': clientId,
         }),
       );
       if (response.statusCode == 200) {
         return jsonDecode(response.body);
       }
+      final message = _errorMessage(response);
+      debugPrint('Join Room failed (${response.statusCode}): $message');
+      onError?.call(message);
     } catch (e) {
       debugPrint('Join Room Error: $e');
+      onError?.call(
+          'Unable to reach the online server. Check your internet connection.');
     }
     return null;
   }
 
   static Future<bool> startRoomMatch(
-      String roomCode, String hostUsername) async {
+      String roomCode, String hostUsername,
+      {String? Function(String message)? onError}) async {
     try {
+      final clientId = await StorageService.getOrCreateClientId();
       final response = await http.post(
         Uri.parse('$baseUrl/api/rooms/$roomCode/start'),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'hostUsername': hostUsername}),
+        body: jsonEncode({'clientId': clientId}),
       );
-      return response.statusCode == 200;
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return true;
+      }
+      final message = _errorMessage(response);
+      debugPrint('Start Room Match failed (${response.statusCode}): $message');
+      onError?.call(message);
     } catch (e) {
       debugPrint('Start Room Match Error: $e');
+      onError?.call(
+          'Unable to reach the online server. Check your internet connection.');
       return false;
     }
+    return false;
+  }
+
+  static Future<Map<String, dynamic>?> getRoomStatus(String roomCode) async {
+    try {
+      final response =
+          await http.get(Uri.parse('$baseUrl/api/rooms/$roomCode'));
+      if (response.statusCode == 200) {
+        final body = jsonDecode(response.body);
+        if (body is Map) {
+          return Map<String, dynamic>.from(body);
+        }
+      } else {
+        debugPrint(
+            'Room status failed (${response.statusCode}): ${_errorMessage(response)}');
+      }
+    } catch (e) {
+      debugPrint('Room status error: $e');
+    }
+    return null;
   }
 
   // --- LEADERBOARD ---
@@ -207,15 +277,17 @@ class ApiService {
     required String idempotencyKey,
   }) async {
     try {
+      final clientId = await StorageService.getOrCreateClientId();
       final response = await http.post(
-        Uri.parse('$baseUrl/api/players/$username/matches'),
+        Uri.parse('$baseUrl/api/players/$clientId/matches'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'matchId': matchId,
           'roomCode': roomCode,
           'playerScore': playerScore,
           'opponentScore': opponentScore,
-          'isWinner': isWinner,
+          'isVictory': isWinner,
+          'mode': 'online',
           'idempotencyKey': idempotencyKey,
         }),
       );
