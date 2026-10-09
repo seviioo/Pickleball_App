@@ -112,18 +112,20 @@ class PerspectiveCourtPainter extends CustomPainter {
     final double maxCourtWidth =
         isLandscape ? size.width * 0.84 : size.width * 0.85;
     final double maxCourtHeight =
-        isLandscape ? size.height * 0.78 : size.height * 0.80;
+        isLandscape ? size.height * 0.70 : size.height * 0.80;
     final double courtHeight = min(
       maxCourtHeight,
       isLandscape ? maxCourtWidth * 1.08 : maxCourtWidth * 1.35,
     );
     final double topWidth =
-        isLandscape ? maxCourtWidth * 0.44 : courtHeight * 0.42;
+        isLandscape ? maxCourtWidth * 0.46 : courtHeight * 0.42;
     final double bottomWidth = isLandscape ? maxCourtWidth : courtHeight * 0.82;
     final double centerY =
-        isLandscape ? size.height * 0.54 : size.height * 0.50;
-    final double topY = centerY - (courtHeight * 0.50);
-    final double bottomY = centerY + (courtHeight * 0.50);
+        isLandscape ? size.height * 0.57 : size.height * 0.50;
+    final double topY =
+        isLandscape ? size.height * 0.22 : centerY - (courtHeight * 0.50);
+    final double bottomY =
+        isLandscape ? size.height * 0.92 : centerY + (courtHeight * 0.50);
     final double centerX = size.width / 2;
 
     Offset perspectiveTransform(double normX, double normY) {
