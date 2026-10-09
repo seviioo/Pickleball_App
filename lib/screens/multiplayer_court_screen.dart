@@ -313,10 +313,13 @@ class _MultiplayerCourtScreenState extends State<MultiplayerCourtScreen> {
               top: isLandscape ? 8 : 12,
               left: isLandscape ? 150 : 124,
               right: isLandscape ? 150 : 8,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Container(
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxWidth: isLandscape ? 400 : 260,
+                  ),
+                  child: Container(
+                    width: double.infinity,
                     padding: EdgeInsets.symmetric(
                       horizontal: isLandscape ? 12 : 10,
                       vertical: isLandscape ? 4 : 8,
@@ -328,11 +331,15 @@ class _MultiplayerCourtScreenState extends State<MultiplayerCourtScreen> {
                           Border.all(color: const Color(0xFFFACC15), width: 2),
                     ),
                     child: Row(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.radio,
-                            color: Color(0xFFFACC15), size: 18),
+                        const Icon(
+                          Icons.radio,
+                          color: Color(0xFFFACC15),
+                          size: 18,
+                        ),
                         const SizedBox(width: 6),
-                        Flexible(
+                        Expanded(
                           child: Text(
                             '${widget.userName}: $myScore  |  ${widget.opponentName}: $opponentScore',
                             maxLines: 1,
@@ -347,7 +354,7 @@ class _MultiplayerCourtScreenState extends State<MultiplayerCourtScreen> {
                       ],
                     ),
                   ),
-                ],
+                ),
               ),
             ),
 
