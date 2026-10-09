@@ -6,6 +6,7 @@ import '../painters/perspective_court_painter.dart';
 import '../services/api_service.dart';
 import '../services/socket_service.dart';
 import 'court_gameplay_screen.dart';
+import 'lobby_screen.dart';
 
 class MultiplayerCourtScreen extends StatefulWidget {
   final String userName;
@@ -155,6 +156,29 @@ class _MultiplayerCourtScreenState extends State<MultiplayerCourtScreen> {
     );
   }
 
+  void _goBack() {
+    SocketService.instance.disconnect();
+    if (Navigator.canPop(context)) {
+      Navigator.pop(context);
+    } else {
+      _goHome();
+    }
+  }
+
+  void _goHome() {
+    SocketService.instance.disconnect();
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(
+        builder: (context) => LobbyScreen(
+          userName: widget.userName,
+          characterStyle: widget.characterStyle,
+        ),
+      ),
+      (route) => false,
+    );
+  }
+
   @override
   void dispose() {
     _movementDirection = Offset.zero;
@@ -225,6 +249,25 @@ class _MultiplayerCourtScreenState extends State<MultiplayerCourtScreen> {
                             color: Colors.white,
                             fontSize: isLandscape ? 14 : 16,
                             fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        Positioned(
+                          top: isLandscape ? 6 : 12,
+                          left: 8,
+                          child: Row(
+                            children: [
+                              _buildNavigationButton(
+                                icon: Icons.arrow_back_rounded,
+                                onPressed: _goBack,
+                                tooltip: 'Back',
+                              ),
+                              const SizedBox(width: 6),
+                              _buildNavigationButton(
+                                icon: Icons.home_rounded,
+                                onPressed: _goHome,
+                                tooltip: 'Home',
+                              ),
+                            ],
                           ),
                         ),
                       ],
@@ -344,6 +387,25 @@ class _MultiplayerCourtScreenState extends State<MultiplayerCourtScreen> {
               fontSize: 11,
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNavigationButton({
+    required IconData icon,
+    required VoidCallback onPressed,
+    required String tooltip,
+  }) {
+    return Tooltip(
+      message: tooltip,
+      child: IconButton(
+        onPressed: onPressed,
+        tooltip: tooltip,
+        icon: Icon(icon, color: Colors.white, size: 24),
+        style: IconButton.styleFrom(
+          backgroundColor: Colors.black.withOpacity(0.72),
+          side: const BorderSide(color: Colors.white24),
         ),
       ),
     );

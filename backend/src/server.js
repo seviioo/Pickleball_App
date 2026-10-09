@@ -434,6 +434,11 @@ const NET_CLEARANCE = 0.08;
       const px = isHost ? state.hostX : state.guestX;
       const py = isHost ? state.hostY : state.guestY;
       const serving = state.phase === 'ready' && state.servingPlayerId === playerId;
+      if (serving &&
+          ((isHost && py < 1.02) || (!isHost && py > -1.02))) {
+        awardPoint(state, isHost ? state.guestId : state.hostId);
+        return;
+      }
       const canHit = serving || (state.phase === 'rally' &&
         ((isHost && state.ballY > -0.05) || (!isHost && state.ballY < 0.05)));
       if (!canHit) return;
@@ -518,10 +523,34 @@ const NET_CLEARANCE = 0.08;
       const hostInput = activeInput(state.hostId);
       const guestInput = activeInput(state.guestId);
       const move = (value) => clamp(Number(value) || 0, -1, 1);
+      const hostMinY = state.phase === 'ready' &&
+          state.servingPlayerId === state.hostId
+        ? 1.02
+        : 0.2;
+      const hostMaxY = state.phase === 'ready' &&
+          state.servingPlayerId === state.hostId
+        ? 1.15
+        : 1.1;
+      const guestMinY = state.phase === 'ready' &&
+          state.servingPlayerId === state.guestId
+        ? -1.15
+        : -1.1;
+      const guestMaxY = state.phase === 'ready' &&
+          state.servingPlayerId === state.guestId
+        ? -1.02
+        : -0.2;
       state.hostX = clamp(state.hostX + move(hostInput.dx) * 1.4 * dt, -0.92, 0.92);
-      state.hostY = clamp(state.hostY + move(hostInput.dy) * 1.4 * dt, 0.2, 1.15);
+      state.hostY = clamp(
+        state.hostY + move(hostInput.dy) * 1.4 * dt,
+        hostMinY,
+        hostMaxY
+      );
       state.guestX = clamp(state.guestX - move(guestInput.dx) * 1.4 * dt, -0.92, 0.92);
-      state.guestY = clamp(state.guestY - move(guestInput.dy) * 1.4 * dt, -1.15, -0.2);
+      state.guestY = clamp(
+        state.guestY - move(guestInput.dy) * 1.4 * dt,
+        guestMinY,
+        guestMaxY
+      );
       for (const [key, input] of [[state.hostId, hostInput], [state.guestId, guestInput]]) {
         const moving = Math.abs(input.dx) > 0.1 || Math.abs(input.dy) > 0.1;
         state.animation[key === state.hostId ? 'host' : 'guest'] = moving ? 'walking' : 'idle';
