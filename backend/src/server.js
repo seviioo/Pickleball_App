@@ -459,7 +459,7 @@ const NET_CLEARANCE = 0.08;
       const targetDepth = type === 'SMASH' ? 0.80 :
         type === 'LOB' ? 0.85 :
         type === 'ROLL' || type === 'SLICE' ? 0.28 :
-        serving ? 0.65 : 0.72;
+        serving ? 0.78 : 0.72;
       const airTime = type === 'SMASH' ? 0.60 :
         type === 'LOB' ? 1.15 :
         type === 'ROLL' || type === 'SLICE' ? 0.85 :
@@ -475,7 +475,8 @@ const NET_CLEARANCE = 0.08;
       const targetX = clamp(isHost ? requestedX : -requestedX, -0.92, 0.92);
       state.ballX = px;
       state.ballY = py;
-      state.ballHeight = 0.45;
+      // Give serves a higher launch so the initial flight clears the net.
+      state.ballHeight = serving ? 0.60 : 0.45;
       const dx = targetX - state.ballX;
       const dy = targetY - state.ballY;
       const crossesNet = state.ballY * targetY < 0;
