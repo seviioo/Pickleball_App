@@ -219,11 +219,32 @@ class _MultiplayerCourtScreenState extends State<MultiplayerCourtScreen> {
               ),
             ),
 
+            // Navigation stays on the side, separate from the score header.
+            Positioned(
+              top: isLandscape ? 8 : 12,
+              left: isLandscape ? 12 : 8,
+              child: Row(
+                children: [
+                  _buildNavigationButton(
+                    icon: Icons.arrow_back_rounded,
+                    onPressed: _goBack,
+                    tooltip: 'Back',
+                  ),
+                  const SizedBox(width: 6),
+                  _buildNavigationButton(
+                    icon: Icons.home_rounded,
+                    onPressed: _goHome,
+                    tooltip: 'Home',
+                  ),
+                ],
+              ),
+            ),
+
             // Header Scoreboard
             Positioned(
-              top: isLandscape ? 6 : 12,
-              left: 12,
-              right: 12,
+              top: isLandscape ? 8 : 12,
+              left: isLandscape ? 150 : 12,
+              right: isLandscape ? 150 : 12,
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -251,25 +272,6 @@ class _MultiplayerCourtScreenState extends State<MultiplayerCourtScreen> {
                             fontWeight: FontWeight.w900,
                           ),
                         ),
-                        Positioned(
-                          top: isLandscape ? 6 : 12,
-                          left: 8,
-                          child: Row(
-                            children: [
-                              _buildNavigationButton(
-                                icon: Icons.arrow_back_rounded,
-                                onPressed: _goBack,
-                                tooltip: 'Back',
-                              ),
-                              const SizedBox(width: 6),
-                              _buildNavigationButton(
-                                icon: Icons.home_rounded,
-                                onPressed: _goHome,
-                                tooltip: 'Home',
-                              ),
-                            ],
-                          ),
-                        ),
                       ],
                     ),
                   ),
@@ -279,7 +281,7 @@ class _MultiplayerCourtScreenState extends State<MultiplayerCourtScreen> {
 
             // Status Banner
             Positioned(
-              top: isLandscape ? 44 : 68,
+              top: isLandscape ? 54 : 68,
               left: 0,
               right: 0,
               child: Center(
